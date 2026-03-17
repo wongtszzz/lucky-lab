@@ -1,112 +1,86 @@
-import streamlit as st
-from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
-from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest
-from alpaca.data.enums import DataFeed
-import numpy as np
-from scipy.stats import norm
-import pandas as pd
-from datetime import datetime, timedelta
+with tab2:
+    st.subheader("🧪 The Lucky Ledger")
 
-# --- 1. CONFIG & BRANDING ---
-st.set_page_config(page_title="Lucky Lab", page_icon="🧪", layout="wide")
+    # --- 1. DASHBOARD METRICS ---
+    if 'journal_data' not in st.session_state:
+        # Initializing with a sample row to show formatting
+        st.session_state.journal_data = pd.DataFrame(columns=["Date", "Ticker", "Strike", "Premium", "Qty", "Total Credit"])
 
-st.html("""
-    <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e1e4e8; }
-    h1 { color: #1e3a8a; font-family: 'Helvetica Neue', sans-serif; }
-    </style>
-""")
+    if not st.session_state.journal_data.empty:
+        # Convert Date column to datetime to handle math
+        df_metrics = st.session_state.journal_data.copy()
+        df_metrics['Date'] = pd.to_datetime(df_metrics['Date'])
+        
+        # Calculations
+        overall_profit = df_metrics["Total Credit"].sum()
+        
+        # Weekly Profit (Last 7 Days)
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        weekly_profit = df_metrics[df_metrics['Date'] >= seven_days_ago]["Total Credit"].sum()
 
-st.title("🧪 Lucky Lab: Options Quant")
+        # Display Metrics
+        m1, m2 = st.columns(2)
+        m1.metric("Overall Profit", f"${overall_profit:,.2f}", help="Total premium banked since day one.")
+        m2.metric("Last 7 Days", f"${weekly_profit:,.2f}", delta=f"{weekly_profit:,.2f}", help="Sum of premiums logged in the last week.")
+        st.divider()
 
-# --- 2. AUTHENTICATION ---
-try:
-    API_KEY = st.secrets["ALPACA_KEY"]
-    SECRET_KEY = st.secrets["ALPACA_SECRET"]
-    stock_client = StockHistoricalDataClient(API_KEY, SECRET_KEY)
-    opt_client = OptionHistoricalDataClient(API_KEY, SECRET_KEY)
-except Exception as e:
-    st.error("⚠️ Lucky Lab Keys Missing. Add ALPACA_KEY and ALPACA_SECRET to Streamlit Secrets.")
-    st.stop()
-
-# --- 3. TABS ---
-tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Trade Journal"])
-
-with tab1:
-    st.subheader("Naked Put Scanner")
-    
-    # User Inputs
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    ticker = col_a.text_input("Ticker Symbol", value="SPY").upper()
-    safety_threshold = col_b.slider("Minimum Safety %", 70, 99, 90)
-    min_vol = col_c.number_input("Min Volume", value=0) # Set to 0 to see everything
-
-    if st.button("🔬 Run Lab Analysis"):
-        with st.spinner(f"Analyzing {ticker}..."):
+    # --- 2. QUICK ENTRY FORM ---
+    with st.expander("➕ Log New Trade", expanded=True):
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+        new_ticker = c1.text_input("Ticker", value="SPY", key="journal_ticker").upper()
+        weeks_out = c2.selectbox("Weeks to Expiry", options=[1, 2, 3, 4, 5], index=0)
+        qty = c3.number_input("Qty (Contracts)", min_value=1, value=1)
+        
+        # Calculate target Friday
+        target_expiry = datetime.now() + timedelta(days=(4 - datetime.now().weekday() + (7 * weeks_out)) % (7 * weeks_out) or (7 * weeks_out))
+        
+        if st.button("🔍 Fetch & Stage Trade"):
             try:
-                # 1. Get Live Price
-                # Using DataFeed.IEX for free/paper users
-                price_req = StockLatestQuoteRequest(symbol_or_symbols=ticker, feed=DataFeed.IEX)
-                price_data = stock_client.get_stock_latest_quote(price_req)
-                current_price = price_data[ticker].ask_price
+                # Get Price
+                price_data = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=new_ticker, feed=DataFeed.IEX))
+                current_p = price_data[new_ticker].ask_price
                 
-                st.metric(f"{ticker} Live Ask", f"${current_price:.2f}")
-
-                # 2. Get Nearest Friday Expiry
-                today = datetime.now()
-                days_to_fri = (4 - today.weekday() + 7) % 7 or 7
-                expiry = today + timedelta(days=days_to_fri)
-                
-                # 3. Fetch Option Chain
-                chain_req = OptionChainRequest(underlying_symbol=ticker, expiration_date=expiry.date())
+                # Fetch Chain
+                chain_req = OptionChainRequest(underlying_symbol=new_ticker, expiration_date=target_expiry.date())
                 chain = opt_client.get_option_chain(chain_req)
                 
-                results = []
-                # Common financial constants for 2026
-                risk_free_rate = 0.042 
-                t_years = max(days_to_fri, 1) / 365
-                
+                # Auto-find a 'Safe' Strike (~95% of current price)
+                best_strike = 0
+                best_premium = 0
                 for strike, data in chain.items():
-                    # Only look at Puts that are cheaper than current price (OTM)
-                    if data.type == 'put' and data.strike < current_price:
-                        
-                        # Math: Probability of Profit (Safety)
-                        iv = data.implied_volatility or 0.18 # Fallback IV
-                        d2 = (np.log(current_price/data.strike) + (risk_free_rate - 0.5*iv**2)*t_years) / (iv*np.sqrt(t_years))
-                        prob_otm = norm.cdf(d2) * 100
-                        
-                        # Filter based on your slider
-                        if prob_otm >= safety_threshold and (data.volume or 0) >= min_vol:
-                            mid_price = (data.bid_price + data.ask_price) / 2
-                            
-                            # Margin requirement estimate
-                            m_req = max((0.20*current_price - (current_price-data.strike) + mid_price)*100, (0.10*data.strike)*100)
-                            ann_roc = (mid_price*100/m_req) * (365/days_to_fri) * 100
-                            
-                            results.append({
-                                "Strike": data.strike,
-                                "Safety %": round(prob_otm, 1),
-                                "Premium": f"${mid_price:.2f}",
-                                "Ann. ROC %": round(ann_roc, 1),
-                                "Volume": data.volume,
-                                "Margin Req": int(m_req)
-                            })
-
-                if results:
-                    df_res = pd.DataFrame(results).sort_values("Ann. ROC %", ascending=False)
-                    st.write(f"### Top Picks for {expiry.date()}")
-                    st.dataframe(df_res, use_container_width=True)
-                else:
-                    st.warning(f"No puts found for {ticker} at {safety_threshold}% safety. Try lowering the threshold or checking a more volatile stock like NVDA.")
-
+                    if data.type == 'put' and data.strike < (current_p * 0.96):
+                        best_strike = data.strike
+                        best_premium = (data.bid_price + data.ask_price) / 2
+                        break
+                
+                st.session_state.staged_trade = {
+                    "Date": datetime.now().strftime("%Y-%m-%d"),
+                    "Ticker": new_ticker,
+                    "Strike": best_strike,
+                    "Premium": best_premium,
+                    "Qty": qty,
+                    "Total Credit": round(best_premium * qty * 100, 2)
+                }
+                st.info(f"Staged: {new_ticker} ${best_strike}P Expiring {target_expiry.date()}")
             except Exception as e:
-                st.error(f"Lab Error: {e}")
+                st.error(f"Error fetching data: {e}")
 
-with tab2:
-    st.subheader("The Ledger")
-    # (Journal code remains same as previous)
-    if 'journal' not in st.session_state:
-        st.session_state.journal = pd.DataFrame(columns=["Date", "Ticker", "Strike", "Premium", "Qty", "P/L ($)"])
-    edited = st.data_editor(st.session_state.journal, num_rows="dynamic", use_container_width=True)
-    st.session_state.journal = edited
+    # --- 3. THE ADD BUTTON & TABLE ---
+    if 'staged_trade' in st.session_state:
+        if st.button("📥 Commit Trade to Ledger"):
+            new_row = pd.DataFrame([st.session_state.staged_trade])
+            st.session_state.journal_data = pd.concat([st.session_state.journal_data, new_row], ignore_index=True)
+            del st.session_state.staged_trade
+            st.rerun()
+
+    edited_df = st.data_editor(
+        st.session_state.journal_data, 
+        num_rows="dynamic", 
+        use_container_width=True,
+        column_config={
+            "Date": st.column_config.DateColumn(),
+            "Total Credit": st.column_config.NumberColumn(format="$ %.2f"),
+            "Premium": st.column_config.NumberColumn(format="$ %.2f")
+        }
+    )
+    st.session_state.journal_data = edited_df
