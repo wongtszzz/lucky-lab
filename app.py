@@ -15,7 +15,7 @@ st.html("""
     .main { background-color: #f5f7f9; }
     .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e1e4e8; }
     h1 { color: #1e3a8a; font-family: 'Helvetica Neue', sans-serif; }
-    [data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; }
+    [data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; border: 1px solid #e1e4e8; }
     </style>
 """)
 
@@ -38,23 +38,23 @@ tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 with tab1:
     st.subheader("Naked Put Scanner")
     col_a, col_b, col_c = st.columns([1, 1, 1])
-    ticker = col_a.text_input("Ticker Symbol", value="SPY").upper()
+    ticker_scan = col_a.text_input("Ticker Symbol", value="SPY", key="scan_tick").upper()
     safety_threshold = col_b.slider("Minimum Safety %", 70, 99, 90)
     min_vol = col_c.number_input("Min Volume", value=0)
 
     if st.button("🔬 Run Lab Analysis"):
-        with st.spinner(f"Analyzing {ticker}..."):
+        with st.spinner(f"Analyzing {ticker_scan}..."):
             try:
-                price_req = StockLatestQuoteRequest(symbol_or_symbols=ticker, feed=DataFeed.IEX)
+                price_req = StockLatestQuoteRequest(symbol_or_symbols=ticker_scan, feed=DataFeed.IEX)
                 price_data = stock_client.get_stock_latest_quote(price_req)
-                current_price = price_data[ticker].ask_price
-                st.metric(f"{ticker} Live Ask", f"${current_price:.2f}")
+                current_price = price_data[ticker_scan].ask_price
+                st.metric(f"{ticker_scan} Live Ask", f"${current_price:.2f}")
 
                 today = datetime.now()
                 days_to_fri = (4 - today.weekday() + 7) % 7 or 7
                 expiry = today + timedelta(days=days_to_fri)
                 
-                chain_req = OptionChainRequest(underlying_symbol=ticker, expiration_date=expiry.date())
+                chain_req = OptionChainRequest(underlying_symbol=ticker_scan, expiration_date=expiry.date())
                 chain = opt_client.get_option_chain(chain_req)
                 
                 results = []
@@ -85,11 +85,10 @@ with tab1:
 with tab2:
     st.subheader("📓 The Lucky Ledger")
 
-    # Initialize dataframe structure
     if 'journal_data' not in st.session_state:
-        st.session_state.journal_data = pd.DataFrame(columns=["Date", "Ticker", "Strike", "Premium", "Qty", "Total Credit"])
+        st.session_state.journal_data = pd.DataFrame(columns=["Date", "Ticker", "Type", "Strike", "Expiry", "Premium", "Qty", "Total Credit"])
 
-    # 1. TOP METRICS (Visible even if data is 0)
+    # 1. TOP METRICS
     m1, m2 = st.columns(2)
     if not st.session_state.journal_data.empty:
         df_metrics = st.session_state.journal_data.copy()
@@ -98,57 +97,58 @@ with tab2:
         seven_days_ago = datetime.now() - timedelta(days=7)
         weekly_p = df_metrics[df_metrics['Date'] >= seven_days_ago]["Total Credit"].astype(float).sum()
     else:
-        overall_p = 0.0
-        weekly_p = 0.0
+        overall_p, weekly_p = 0.0, 0.0
 
     m1.metric("Overall Profit", f"${overall_p:,.2f}")
     m2.metric("Last 7 Days Profit", f"${weekly_p:,.2f}")
     st.divider()
 
-    # 2. ENTRY FORM
+    # 2. UPDATED ENTRY FORM
     with st.expander("➕ Log New Trade", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        new_ticker = c1.text_input("Ticker", value="SPY", key="j_ticker").upper()
-        weeks_out = c2.selectbox("Weeks to Expiry", options=[1, 2, 3, 4, 5])
-        qty = c3.number_input("Qty", min_value=1, value=1)
+        row1 = st.columns([1, 1, 1])
+        new_ticker = row1[0].text_input("Ticker", value="SPY", key="log_tick").upper()
+        strategy = row1[1].selectbox("Strategy", options=["Short Put", "Short Call"], index=0)
+        qty = row1[2].number_input("Qty (Contracts)", min_value=1, value=1)
+
+        row2 = st.columns([1, 1])
+        next_fri = datetime.now() + timedelta(days=(4 - datetime.now().weekday() + 7) % 7 or 7)
+        expiry_date = row2[0].date_input("Expiry Date", value=next_fri)
+        strike_price = row2[1].number_input("Target Strike Price", value=0.0, step=0.5)
         
-        if st.button("🔍 Fetch & Stage Trade"):
-            try:
-                target_expiry = datetime.now() + timedelta(days=(4 - datetime.now().weekday() + (7 * weeks_out)) % (7 * weeks_out) or (7 * weeks_out))
-                price_data = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=new_ticker, feed=DataFeed.IEX))
-                curr_p = price_data[new_ticker].ask_price
-                chain = opt_client.get_option_chain(OptionChainRequest(underlying_symbol=new_ticker, expiration_date=target_expiry.date()))
-                
-                staged_found = False
-                for symbol, data in chain.items():
-                    if "P" in symbol and data.strike < (curr_p * 0.95):
-                        p_val = (data.bid_price + data.ask_price) / 2
-                        if p_val == 0: p_val = getattr(data, 'last_price', 0.05)
-                        
-                        st.session_state.staged = {
-                            "Date": datetime.now().strftime("%Y-%m-%d"), 
-                            "Ticker": new_ticker,
-                            "Strike": data.strike, 
-                            "Premium": float(p_val), 
-                            "Qty": int(qty),
-                            "Total Credit": round(float(p_val) * qty * 100, 2)
-                        }
-                        st.info(f"Staged: {new_ticker} ${data.strike}P | Total: ${st.session_state.staged['Total Credit']}")
-                        staged_found = True
-                        break
-                if not staged_found:
-                    st.warning("No safe puts found for this date.")
-            except Exception as e:
-                st.error(f"Fetch failed: {e}")
+        if st.button("🚀 Fetch & Commit to Ledger"):
+            if strike_price <= 0:
+                st.warning("Please enter a valid Strike Price.")
+            else:
+                try:
+                    chain = opt_client.get_option_chain(OptionChainRequest(underlying_symbol=new_ticker, expiration_date=expiry_date))
+                    flag = "P" if strategy == "Short Put" else "C"
+                    match_found = False
+                    
+                    for symbol, data in chain.items():
+                        if flag in symbol and data.strike == strike_price:
+                            p_val = (data.bid_price + data.ask_price) / 2
+                            if p_val == 0: p_val = getattr(data, 'last_price', 0.0)
+                            
+                            new_entry = {
+                                "Date": datetime.now().strftime("%Y-%m-%d"),
+                                "Ticker": new_ticker,
+                                "Type": strategy,
+                                "Strike": float(strike_price),
+                                "Expiry": expiry_date.strftime("%Y-%m-%d"),
+                                "Premium": float(p_val),
+                                "Qty": int(qty),
+                                "Total Credit": round(float(p_val) * qty * 100, 2)
+                            }
+                            st.session_state.journal_data = pd.concat([st.session_state.journal_data, pd.DataFrame([new_entry])], ignore_index=True)
+                            match_found = True
+                            st.rerun()
+                            break
+                    if not match_found:
+                        st.error(f"Strike ${strike_price} not found for this date.")
+                except Exception as e:
+                    st.error(f"Fetch failed: {e}")
 
-    # Commit button logic
-    if 'staged' in st.session_state:
-        if st.button("📥 Commit Trade to Ledger"):
-            st.session_state.journal_data = pd.concat([st.session_state.journal_data, pd.DataFrame([st.session_state.staged])], ignore_index=True)
-            del st.session_state.staged
-            st.rerun()
-
-    # 3. THE DATA TABLE
-    st.write("### Your Trade History")
+    # 3. TRADE HISTORY
+    st.write("### Trade History")
     edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True)
     st.session_state.journal_data = edited_df
