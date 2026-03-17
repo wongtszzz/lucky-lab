@@ -58,7 +58,6 @@ with tab1:
                 
                 results = []
                 for symbol, data in chain.items():
-                    # Fixed: Using symbol string to identify Puts
                     if "P" in symbol and data.strike < current_price:
                         iv = data.implied_volatility or 0.18
                         t_years = max(days_to_fri, 1) / 365
@@ -81,9 +80,4 @@ with tab1:
             except Exception as e:
                 st.error(f"Lab Error: {e}")
 
-# --- TAB 2: LUCKY LEDGER ---
-with tab2:
-    st.subheader("📓 The Lucky Ledger")
-
-    if 'journal_data' not in st.session_state:
-        st.session_state.journal_data = pd.DataFrame(columns=["Date", "Ticker", "Strike", "Premium
+# --- TAB 2:
