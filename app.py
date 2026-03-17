@@ -1,9 +1,8 @@
 import streamlit as st
 from alpaca.data.historical import OptionHistoricalDataClient
-from alpaca.data.requests import OptionChainRequest, OptionLatestQuoteRequest, OptionBarsRequest
-from alpaca.data.timeframe import TimeFrame
+from alpaca.data.requests import OptionChainRequest, OptionLatestQuoteRequest
 from alpaca.data.enums import OptionsFeed
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 
 # --- 1. CONFIG & AUTH ---
@@ -33,60 +32,61 @@ with st.expander("➕ Log New Trade", expanded=True):
     exp_date = c4.date_input("Expiry Date", value=datetime.now().date())
     
     c5, c6 = st.columns(2)
-    # STRIKE: 0.5 step, %g format
+    # STRIKE: 0.5 step, %g format hides .0, Starts Empty
     strike = c5.number_input("Strike Price", value=None, step=0.5, format="%g", placeholder="Enter Strike (e.g. 345)")
     
-    # MANUAL OVERRIDE: If you want to input the EXACT price you got at IBKR
-    manual_price = c6.number_input("Manual Price (Optional)", value=None, step=0.01, format="%.2f", placeholder="Override fetched price...")
+    # MANUAL PRICE: This is now your primary backup
+    manual_price = c6.number_input("Manual Price (Per Share)", value=None, step=0.01, format="%.2f", placeholder="Enter Price (e.g. 0.59)")
     
     if st.button("🚀 Commit & Calculate"):
         if strike is None:
             st.error("Please enter a strike price.")
         else:
-            try:
-                flag = "P" if strat == "Short Put" else "C"
-                strike_code = f"{int(round(strike * 1000)):08d}"
-                exp_code = exp_date.strftime('%y%m%d')
-                sym = f"{t_input}{exp_code}{flag}{strike_code}"
-                
-                final_price = 0.0
-                
-                # If you didn't provide a manual price, we fetch the indicative one
-                if manual_price is None or manual_price == 0:
-                    try:
-                        chain = opt_client.get_option_chain(OptionChainRequest(underlying_symbol=t_input, expiration_date=exp_date, feed=OptionsFeed.INDICATIVE))
-                        if sym in chain: final_price = (chain[sym].bid_price + chain[sym].ask_price) / 2
-                    except: pass
+            final_price = 0.0
+            
+            # 1. Try to Fetch if manual is empty
+            if manual_price is None or manual_price == 0:
+                try:
+                    # Attempting to fetch indicative data
+                    chain = opt_client.get_option_chain(OptionChainRequest(underlying_symbol=t_input, expiration_date=exp_date, feed=OptionsFeed.INDICATIVE))
+                    flag = "P" if strat == "Short Put" else "C"
+                    strike_code = f"{int(round(strike * 1000)):08d}"
+                    sym = f"{t_input}{exp_date.strftime('%y%m%d')}{flag}{strike_code}"
                     
-                    if final_price == 0:
-                        try:
-                            lq = opt_client.get_option_latest_quote(OptionLatestQuoteRequest(symbol_or_symbols=sym, feed=OptionsFeed.INDICATIVE))
-                            if sym in lq: final_price = (lq[sym].bid_price + lq[sym].ask_price) / 2
-                        except: pass
-                else:
-                    final_price = manual_price
+                    if sym in chain:
+                        final_price = (chain[sym].bid_price + chain[sym].ask_price) / 2
+                except:
+                    pass # Silently fail to Step 2
+            else:
+                # 2. Use your Manual Entry
+                final_price = manual_price
 
-                if final_price > 0:
-                    # Calculation
-                    cash_premium = round(float(final_price) * 100, 2)
-                    comm = max(1.05, 0.70 * qty) # IBKR Tiered Min
-                    net_received = (cash_premium * qty) - comm
-                    
-                    display_strike = int(strike) if strike % 1 == 0 else strike
-                    
-                    new_row = {
-                        "Ticker": t_input, "Type": strat, "Strike": display_strike, 
-                        "Expiry": exp_date.strftime("%Y-%m-%d"),
-                        "Premium (Total)": cash_premium, 
-                        "Qty": int(qty),
-                        "Total Premium Collected": round(net_received, 2)
-                    }
-                    st.session_state.journal_data = pd.concat([st.session_state.journal_data, pd.DataFrame([new_row])], ignore_index=True)
-                    st.rerun()
-                else:
-                    st.error("Could not fetch price. Please enter it manually in the 'Manual Price' box.")
-            except Exception as e:
-                st.error(f"Error: {e}")
+            if final_price > 0:
+                # --- CALCULATION ENGINE ---
+                # Premium is (Price * 100)
+                cash_premium = round(float(final_price) * 100, 2)
+                
+                # IBKR Tiered Fees: ~$0.70/contract with $1.05 absolute minimum
+                comm = max(1.05, 0.70 * qty)
+                
+                # Net = (Premium * Qty) - Fees
+                net_received = (cash_premium * qty) - comm
+                
+                display_strike = int(strike) if strike % 1 == 0 else strike
+                
+                new_row = {
+                    "Ticker": t_input, 
+                    "Type": strat, 
+                    "Strike": display_strike, 
+                    "Expiry": exp_date.strftime("%Y-%m-%d"),
+                    "Premium (Total)": cash_premium, 
+                    "Qty": int(qty),
+                    "Total Premium Collected": round(net_received, 2)
+                }
+                st.session_state.journal_data = pd.concat([st.session_state.journal_data, pd.DataFrame([new_row])], ignore_index=True)
+                st.rerun()
+            else:
+                st.warning("⚠️ Data fetch failed. Please enter the 'Manual Price (Per Share)' to finish the log.")
 
 # --- 4. TABLE ---
 st.write("### Trade History")
