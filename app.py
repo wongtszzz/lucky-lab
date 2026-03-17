@@ -87,12 +87,26 @@ with tab1:
 with tab2:
     st.subheader("📓 The Lucky Ledger")
 
+    # --- SAFETY RESET LOGIC ---
+    expected_cols = ["Ticker", "Type", "Strike", "Expiry", "Premium", "Qty", "Commission", "Total Profit"]
+    
     if 'journal_data' not in st.session_state:
-        st.session_state.journal_data = pd.DataFrame(columns=["Ticker", "Type", "Strike", "Expiry", "Premium", "Qty", "Commission", "Total Profit"])
+        st.session_state.journal_data = pd.DataFrame(columns=expected_cols)
+    else:
+        # If the user has old data with "Total Credit", rename it to "Total Profit" automatically
+        if "Total Credit" in st.session_state.journal_data.columns:
+            st.session_state.journal_data = st.session_state.journal_data.rename(columns={"Total Credit": "Total Profit"})
+        
+        # Ensure "Commission" exists
+        if "Commission" not in st.session_state.journal_data.columns:
+            st.session_state.journal_data["Commission"] = 0.0
 
     # 1. TOP METRICS
     m1, m2 = st.columns(2)
-    overall_p = st.session_state.journal_data["Total Profit"].astype(float).sum() if not st.session_state.journal_data.empty else 0.0
+    # Convert to numeric to avoid errors if the table is edited manually
+    profits = pd.to_numeric(st.session_state.journal_data["Total Profit"], errors='coerce').fillna(0)
+    overall_p = profits.sum()
+    
     m1.metric("Net Profit (After Fees)", f"${overall_p:,.2f}")
     m2.metric("Portfolio Status", "Online" if overall_p >= 0 else "Pending Recovery")
     st.divider()
@@ -141,20 +155,12 @@ with tab2:
                             if p_val == 0: p_val = getattr(data, 'last_price', 0.05)
 
                     if p_val > 0:
-                        # --- IBKR TIERED PRICING FORMULA ---
-                        # Commission per contract based on premium
-                        if p_val >= 0.10:
-                            base_comm = 0.65
-                        elif p_val >= 0.05:
-                            base_comm = 0.50
-                        else:
-                            base_comm = 0.25
+                        # --- IBKR TIERED PRICING ---
+                        if p_val >= 0.10: base_comm = 0.65
+                        elif p_val >= 0.05: base_comm = 0.50
+                        else: base_comm = 0.25
                         
-                        # Pass-through fees (estimates for 2026)
-                        # OCC Clearing: $0.02, ORF: $0.02, FINRA TAF: $0.003
-                        third_party_fees = 0.045 
-                        
-                        total_comm_per_contract = base_comm + third_party_fees
+                        total_comm_per_contract = base_comm + 0.045 
                         order_comm = max(1.00, total_comm_per_contract * qty)
                         
                         total_profit = (p_val * 100 * qty) - order_comm
@@ -164,7 +170,7 @@ with tab2:
                             "Type": strategy, 
                             "Strike": round(target_strike, 1), 
                             "Expiry": expiry_date.strftime("%Y-%m-%d"),
-                            "Premium": f"USD {int(p_val * 100)}", 
+                            "Premium": f"USD {int(round(p_val * 100))}", 
                             "Qty": int(qty),
                             "Commission": round(order_comm, 2),
                             "Total Profit": round(total_profit, 2)
@@ -179,5 +185,6 @@ with tab2:
 
     # 3. HISTORY TABLE
     st.write("### Trade History")
+    # Using data_editor allows you to fix any manual mistakes in the profit column
     edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True, key="ledger_editor")
     st.session_state.journal_data = edited_df
