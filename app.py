@@ -39,11 +39,11 @@ tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 with tab1:
     st.subheader("Naked Put Scanner")
     col_a, col_b, col_c = st.columns([1, 1, 1])
-    ticker_scan = col_a.text_input("Ticker Symbol", value="SPY", key="scan_tick").upper()
-    safety_threshold = col_b.slider("Minimum Safety %", 70, 99, 90)
-    min_vol = col_c.number_input("Min Volume", value=0)
+    ticker_scan = col_a.text_input("Ticker Symbol", value="SPY", key="scan_ticker_input").upper()
+    safety_threshold = col_b.slider("Minimum Safety %", 70, 99, 90, key="safety_slider")
+    min_vol = col_c.number_input("Min Volume", value=0, key="vol_input")
 
-    if st.button("🔬 Run Lab Analysis"):
+    if st.button("🔬 Run Lab Analysis", key="run_scan_btn"):
         with st.spinner(f"Analyzing {ticker_scan}..."):
             try:
                 price_data = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=ticker_scan, feed=DataFeed.IEX))
@@ -90,20 +90,21 @@ with tab2:
     m1, m2 = st.columns(2)
     overall_p = st.session_state.journal_data["Total Credit"].astype(float).sum() if not st.session_state.journal_data.empty else 0.0
     m1.metric("Overall Profit", f"${overall_p:,.2f}")
-    m2.metric("Portfolio Health", "Active" if overall_p >= 0 else "Recovering")
+    m2.metric("Portfolio Status", "Online" if overall_p >= 0 else "Pending Recovery")
+    st.divider()
 
     # 2. ENTRY FORM
     with st.expander("➕ Log New Trade", expanded=True):
         c1, c2, c3 = st.columns(3)
-        new_ticker = c1.text_input("Ticker", value="SPY", key="log_tick").upper()
-        strategy = c2.selectbox("Strategy", options=["Short Put", "Short Call"], index=0)
-        qty = c3.number_input("Qty", min_value=1, value=1)
+        new_ticker = c1.text_input("Ticker", value="SPY", key="ledger_ticker_input").upper()
+        strategy = c2.selectbox("Strategy", options=["Short Put", "Short Call"], index=0, key="strat_select")
+        qty = c3.number_input("Qty", min_value=1, value=1, key="qty_input")
 
         c4, c5 = st.columns(2)
-        expiry_date = c4.date_input("Expiry Date", value=datetime.now().date())
-        target_strike = c5.number_input("Target Strike", value=0.0, step=0.5)
+        expiry_date = c4.date_input("Expiry Date", value=datetime.now().date(), key="expiry_picker")
+        target_strike = c5.number_input("Target Strike", value=0.0, step=0.5, key="strike_input")
         
-        if st.button("🚀 Fetch & Commit"):
+        if st.button("🚀 Fetch & Commit", key="commit_btn"):
             try:
                 is_expired = expiry_date < datetime.now().date()
                 flag = "P" if strategy == "Short Put" else "C"
@@ -113,13 +114,18 @@ with tab2:
                 p_val = 0.0
 
                 if is_expired:
-                    # Historical Logic: Check a 7-day window to ensure we find a trading bar
+                    # FIX: Handling 'list' object correctly (using len and indexing)
                     end_dt = datetime.combine(expiry_date, datetime.now().time())
                     start_dt = end_dt - timedelta(days=7)
                     req = OptionBarsRequest(symbol_or_symbols=opt_symbol, timeframe=TimeFrame.Day, start=start_dt, end=end_dt)
-                    bars = opt_client.get_option_bars(req)
-                    if opt_symbol in bars.data and not bars.data[opt_symbol].empty:
-                        p_val = bars.data[opt_symbol].iloc[-1].close
+                    bars_response = opt_client.get_option_bars(req)
+                    
+                    if opt_symbol in bars_response.data and len(bars_response.data[opt_symbol]) > 0:
+                        # Access the last bar in the list
+                        last_bar = bars_response.data[opt_symbol][-1]
+                        p_val = last_bar.close
+                    else:
+                        st.error(f"No historical data for {opt_symbol} in the last 7 days.")
                 else:
                     # Live Logic
                     chain = opt_client.get_option_chain(OptionChainRequest(underlying_symbol=new_ticker, expiration_date=expiry_date))
@@ -135,15 +141,14 @@ with tab2:
                         "Premium": float(p_val), "Qty": int(qty), "Total Credit": round(float(p_val) * qty * 100, 2)
                     }
                     st.session_state.journal_data = pd.concat([st.session_state.journal_data, pd.DataFrame([new_row])], ignore_index=True)
-                    st.success(f"Logged {opt_symbol} at ${p_val}")
                     st.rerun()
                 else:
-                    st.error(f"Could not find price for {opt_symbol}. Is the strike/date correct?")
+                    st.error(f"Could not calculate premium for {opt_symbol}.")
 
             except Exception as e:
                 st.error(f"Fetch failed: {e}")
 
     # 3. HISTORY TABLE
     st.write("### Trade History")
-    edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True)
+    edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True, key="ledger_editor")
     st.session_state.journal_data = edited_df
