@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import shutil
 from scipy.stats import norm
 from datetime import datetime, timedelta
 from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
@@ -17,6 +18,7 @@ st.markdown("""
     .stMetric { background-color: #f0f2f6; padding: 5px 15px; border-radius: 10px; border: 1px solid #dcdcdc; }
     div[data-testid="stExpander"] { border: 1px solid #e6e9ef; border-radius: 10px; }
     hr {margin: 0.5em 0px;}
+    .footer { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.7em; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -36,11 +38,14 @@ except:
     st.error("Alpaca Keys Missing.")
     st.stop()
 
-# --- 2. PERMANENT STORAGE & SORTING ---
+# --- 2. PERMANENT STORAGE & AUTO-RESTORE LOGIC ---
 DB_FILE = "lucky_ledger.csv"
+BACKUP_FILE = "lucky_ledger_backup.csv"
 
 def save_data(df):
     df.to_csv(DB_FILE, index=False)
+    shutil.copy2(DB_FILE, BACKUP_FILE)
+    st.session_state.last_backup = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def apply_custom_sort(df):
     if df.empty: return df
@@ -52,29 +57,29 @@ def apply_custom_sort(df):
 
 def load_data():
     cols = ["Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Premium", "Status"]
+    if not os.path.exists(DB_FILE) and os.path.exists(BACKUP_FILE):
+        shutil.copy2(BACKUP_FILE, DB_FILE)
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # FIX: Mapping all possible old column names to 'Premium'
-            rename_map = {
-                "Total Premium Collected": "Premium",
-                "Premium (Total)": "Premium",
-                "Premium Collected": "Premium"
-            }
+            rename_map = {"Total Premium Collected": "Premium", "Premium (Total)": "Premium", "Premium (total)": "Premium"}
             df = df.rename(columns=rename_map)
-            
-            # Ensure all columns exist so we never get a KeyError again
             for c in cols:
                 if c not in df.columns:
                     df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium"] else (1 if c == "Qty" else "Unknown")
-            
+            if 'last_backup' not in st.session_state:
+                st.session_state.last_backup = datetime.fromtimestamp(os.path.getmtime(DB_FILE)).strftime("%Y-%m-%d %H:%M:%S")
             return apply_custom_sort(df[cols])
-        except Exception as e:
-            st.error(f"Load Error: {e}")
+        except:
+            if os.path.exists(BACKUP_FILE):
+                shutil.copy2(BACKUP_FILE, DB_FILE)
+                return load_data()
     return pd.DataFrame(columns=cols)
 
 if 'journal_data' not in st.session_state:
     st.session_state.journal_data = load_data()
+if 'last_backup' not in st.session_state:
+    st.session_state.last_backup = "No backup yet"
 
 # --- 3. TABS ---
 tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
@@ -82,9 +87,9 @@ tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 # --- TAB 1: STRATEGY OPTIMIZER ---
 with tab1:
     c1, c2 = st.columns([1, 2])
-    t_scan = c1.text_input("Ticker", value="TSM", key="opt_tk_fix").upper()
-    safety_target = c2.slider("Safety %", 70, 99, 90, key="opt_sf_fix")
-    if st.button("🔬 Run Analysis", key="opt_btn_fix"):
+    t_scan = c1.text_input("Ticker", value="TSM", key="opt_tk_r3").upper()
+    safety_target = c2.slider("Safety %", 70, 99, 90, key="opt_sf_r3")
+    if st.button("🔬 Run Analysis", key="opt_btn_r3"):
         with st.spinner("Analyzing..."):
             try:
                 price_data = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=t_scan, feed=DataFeed.IEX))
@@ -107,58 +112,49 @@ with tab1:
 
 # --- TAB 2: LUCKY LEDGER ---
 with tab2:
-    # Safely handle the Premium calculation
-    if "Premium" in st.session_state.journal_data.columns:
-        raw_val = pd.to_numeric(st.session_state.journal_data["Premium"], errors='coerce').fillna(0).sum()
-    else:
-        raw_val = 0.0
-        
-    st.metric(label="**Total Premium Collected** 🤑", value=f"{int(round(raw_val)):,} (~HKD {int(round(raw_val * 7.8)):,})")
+    # Summary Metrics
+    raw_val = pd.to_numeric(st.session_state.journal_data["Premium"], errors='coerce').fillna(0).sum()
+    active_count = len(st.session_state.journal_data[st.session_state.journal_data["Status"].astype(str).str.contains("Open", na=False)])
+    
+    m1, m2 = st.columns(2)
+    m1.metric(label="**Total Premium Collected** 🤑", value=f"{int(round(raw_val)):,} (~HKD {int(round(raw_val * 7.8)):,})")
+    m2.metric(label="**Active Trades** 📈", value=active_count)
 
     with st.expander("➕ Log New Trade", expanded=True):
         l1, l2, l3, l4 = st.columns(4)
-        t_log = l1.text_input("Ticker", value="TSM", key="log_tk_fix").upper()
-        type_log = l2.selectbox("Type", ["Short Put", "Short Call"], key="log_ty_fix")
-        qty_log = l3.number_input("Qty", min_value=1, value=1, key="log_q_fix")
-        exp_log = l4.date_input("Expiry", value=datetime.now().date(), key="log_ex_fix")
+        t_log = l1.text_input("Ticker", value="TSM", key="log_tk_r3").upper()
+        type_log = l2.selectbox("Type", ["Short Put", "Short Call"], key="log_ty_r3")
+        qty_log = l3.number_input("Qty", min_value=1, value=1, key="log_q_r3")
+        exp_log = l4.date_input("Expiry", value=datetime.now().date(), key="log_ex_r3")
         
-        l5, l6, l7 = st.columns(3)
-        stk_log = l5.number_input("Strike", value=None, step=0.5, format="%g", key="log_st_fix")
-        op_log = l6.number_input("Open Price (Sell)", value=None, step=0.01, format="%.2f", key="log_op_fix")
-        cl_log = l7.number_input("Close Price (Buy Back)", value=0.00, step=0.01, format="%.2f", key="log_cl_fix")
+        l5, l6 = st.columns(2)
+        stk_log = l5.number_input("Strike", value=None, step=0.5, format="%g", key="log_st_r3")
+        op_log = l6.number_input("Open Price (Sell)", value=None, step=0.01, format="%.2f", key="log_op_r3")
         
-        if st.button("🚀 Commit Trade", use_container_width=True, key="log_cmt_fix"):
+        if st.button("🚀 Commit Trade", use_container_width=True, key="log_cmt_r3"):
             if stk_log and op_log is not None:
-                net = round(((float(op_log) - float(cl_log)) * 100 * qty_log) - max(1.05, 0.70 * qty_log), 2)
+                net = round((float(op_log) * 100 * qty_log) - max(1.05, 0.70 * qty_log), 2)
                 today = datetime.now().date()
-                if cl_log > 0: status = "Closed"
-                elif exp_log < today: status = "Expired (Win)"
-                else: status = "Open / Running"
+                status = "Expired (Win)" if exp_log < today else "Open / Running"
                 
-                new_row = {
-                    "Ticker": t_log, "Type": type_log, "Strike": stk_log, "Expiry": exp_log.strftime("%Y-%m-%d"),
-                    "Open Price": op_log, "Close Price": cl_log, "Qty": qty_log, "Premium": net, "Status": status
-                }
+                new_row = {"Ticker": t_log, "Type": type_log, "Strike": stk_log, "Expiry": exp_log.strftime("%Y-%m-%d"),
+                           "Open Price": op_log, "Close Price": 0.00, "Qty": qty_log, "Premium": net, "Status": status}
                 st.session_state.journal_data = pd.concat([st.session_state.journal_data, pd.DataFrame([new_row])], ignore_index=True)
                 st.session_state.journal_data = apply_custom_sort(st.session_state.journal_data)
                 save_data(st.session_state.journal_data)
                 st.rerun()
 
     st.write("### History")
-    edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True, key="editor_fix")
+    edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True, key="editor_r3")
     
     if not edited_df.equals(st.session_state.journal_data):
-        st.session_state.journal_data = edited_df
-        save_data(edited_df)
-
-    if st.button("🔄 Recalculate Everything", key="recalc_fix"):
-        df = st.session_state.journal_data.copy()
+        df = edited_df.copy()
         df["Open Price"] = pd.to_numeric(df["Open Price"], errors='coerce').fillna(0)
         df["Close Price"] = pd.to_numeric(df["Close Price"], errors='coerce').fillna(0)
         df["Qty"] = pd.to_numeric(df["Qty"], errors='coerce').fillna(1)
-        
         today = datetime.now().date()
-        def up_row(r):
+        
+        def refresh_row(r):
             p = round(((r["Open Price"] - r["Close Price"]) * 100 * r["Qty"]) - max(1.05, 0.70 * r["Qty"]), 2)
             try: exp_d = datetime.strptime(str(r["Expiry"]), "%Y-%m-%d").date()
             except: exp_d = today
@@ -166,9 +162,14 @@ with tab2:
             elif exp_d < today: s = "Expired (Win)"
             else: s = "Open / Running"
             return pd.Series([p, s])
-
-        df[["Premium", "Status"]] = df.apply(up_row, axis=1)
+            
+        df[["Premium", "Status"]] = df.apply(refresh_row, axis=1)
         st.session_state.journal_data = apply_custom_sort(df)
         save_data(st.session_state.journal_data)
-        st.session_state.last_refresh = datetime.now().strftime("%H:%M:%S")
         st.rerun()
+
+    if st.button("🔄 Recalculate Everything", key="recalc_r3"):
+        st.rerun()
+
+# --- FOOTER TIMESTAMP ---
+st.markdown(f'<div class="footer">Last Backup: {st.session_state.last_backup}</div>', unsafe_allow_html=True)
