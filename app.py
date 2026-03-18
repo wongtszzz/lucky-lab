@@ -41,8 +41,7 @@ COLS = ["Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty"
 def calc_ibkr_commission(qty):
     """Calculates IBKR Tiered Commission strictly as 1.05 per contract"""
     try:
-        q = float(qty)
-        return round(q * 1.05, 2)
+        return round(float(qty) * 1.05, 2)
     except:
         return 1.05
 
@@ -74,7 +73,7 @@ if 'journal' not in st.session_state:
 # --- 3. UI TABS ---
 tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 
-# --- OPTIMIZER ---
+# --- OPTIMIZER (Unchanged) ---
 with tab1:
     c1, c2 = st.columns([1, 2])
     tk = c1.text_input("Ticker", value="TSM", key="opt_tk").upper()
@@ -108,7 +107,7 @@ with tab2:
     m2.metric("**Active Trades** 📈", active_count)
 
     with st.expander("➕ Log New Trade"):
-        if st.button("🔄 Reset", key="reset_btn"):
+        if st.button("🔄 Reset Form", key="reset_btn"):
             st.session_state.log_tk = ""
             st.session_state.log_st = None
             st.session_state.log_op = None
@@ -121,22 +120,18 @@ with tab2:
         n_ex = l4.date_input("Expiry", datetime.now().date(), key="log_ex")
         
         l5, l6 = st.columns(2)
-        n_st = l5.number_input("Strike", value=None, placeholder="Type Strike...", step=0.1, key="log_st", format="%.1f")
-        n_op = l6.number_input("Open Price", value=None, placeholder="Type Price...", step=0.01, key="log_op", format="%.2f")
+        n_st = l5.number_input("Strike", value=None, placeholder="Strike", step=0.1, key="log_st", format="%.1f")
+        n_op = l6.number_input("Open Price", value=None, placeholder="0.59", step=0.01, key="log_op", format="%.2f")
         
         if st.button("🚀 Commit Trade", use_container_width=True):
             if n_st is not None and n_op is not None and n_tk != "":
                 comm = calc_ibkr_commission(n_qt)
-                net = round((n_op * 100 * n_qt) - comm, 2)
+                net = round((float(n_op) * 100 * n_qt) - comm, 2)
                 stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Running"
                 
-                new_row = pd.DataFrame([{"Ticker": n_tk, "Type": n_ty, "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(n_op, 2), "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat}])
+                new_row = pd.DataFrame([{"Ticker": n_tk, "Type": n_ty, "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat}])
                 st.session_state.journal = pd.concat([df_j, new_row], ignore_index=True)
                 save_and_backup(st.session_state.journal)
-                
-                st.session_state.log_tk = ""
-                st.session_state.log_st = None
-                st.session_state.log_op = None
                 st.rerun()
 
     st.write("### History")
@@ -144,7 +139,7 @@ with tab2:
         st.session_state.journal, 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v14",
+        key="ledger_editor_v17",
         column_config={
             "Strike": st.column_config.NumberColumn(format="%.1f"),
             "Open Price": st.column_config.NumberColumn(format="%.2f"),
@@ -162,24 +157,32 @@ with tab2:
         current_df["Commission"] = current_df["Qty"].apply(calc_ibkr_commission)
         
         def update_row(r):
-            p = round(((r["Open Price"] - r["Close Price"]) * 100 * r["Qty"]) - r["Commission"], 2)
+            open_p, close_p, qty, comm = float(r["Open Price"]), float(r["Close Price"]), int(r["Qty"]), float(r["Commission"])
+            # Calculation: (Open - Close) * 100 * Qty - Total Commission
+            p = round(((open_p - close_p) * 100 * qty) - comm, 2)
+            
             try: ex_d = datetime.strptime(str(r["Expiry"]), "%Y-%m-%d").date()
             except: ex_d = datetime.now().date()
-            s = "Closed" if r["Close Price"] > 0 else ("Expired (Win)" if ex_d < datetime.now().date() else "Open / Running")
+            
+            # Logic: If Close is 0, status depends on Expiry
+            if close_p > 0:
+                s = "Closed"
+            else:
+                s = "Expired (Win)" if ex_d < datetime.now().date() else "Open / Running"
+            
             return pd.Series([p, s])
         
         current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
         return current_df
 
-    # Auto-update if data editor changes
+    # Auto-save if editor changes
     if not edt.equals(st.session_state.journal):
         st.session_state.journal = refresh_calculations(edt)
         save_and_backup(st.session_state.journal)
         st.rerun()
 
-    # Manual Refresh Button
-    st.divider()
-    if st.button("🔄 Refresh Data", use_container_width=False):
+    # Refresh Button
+    if st.button("🔄 Refresh & Recalculate"):
         st.session_state.journal = refresh_calculations(st.session_state.journal)
         save_and_backup(st.session_state.journal)
         st.rerun()
