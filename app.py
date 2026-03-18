@@ -102,9 +102,10 @@ with tab2:
         n_qt = l3.number_input("Qty", 1, key="log_qty")
         n_ex = l4.date_input("Expiry", datetime.now().date(), key="log_ex")
         l5, l6 = st.columns(2)
-        # FIXED: value=None allows free entry without removing 0.0 first
-        n_st = l5.number_input("Strike", value=None, placeholder="Enter Strike...", step=0.1, key="log_st", format="%.1f")
-        n_op = l6.number_input("Open Price", value=None, placeholder="Enter Price...", step=0.1, key="log_op", format="%.1f")
+        
+        # value=None prevents the default 0.0 from appearing
+        n_st = l5.number_input("Strike", value=None, placeholder="Type Strike...", step=0.1, key="log_st", format="%.1f")
+        n_op = l6.number_input("Open Price", value=None, placeholder="Type Price...", step=0.1, key="log_op", format="%.1f")
         
         if st.button("🚀 Commit Trade", use_container_width=True, key="log_btn"):
             if n_st is not None and n_op is not None:
