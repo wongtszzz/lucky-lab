@@ -11,11 +11,11 @@ from alpaca.data.enums import OptionsFeed, DataFeed
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Quants Lab", page_icon="🧪", layout="wide")
 
-# FIX: Theme-adaptive CSS for Metric Boxes (Works in Light & Dark Mode)
+# FIX: Background set to transparent to inherit system theme background
 st.markdown("""
 <style>
     [data-testid="stMetric"] {
-        background-color: rgba(128, 128, 128, 0.1); 
+        background-color: transparent; 
         padding: 15px; 
         border-radius: 10px; 
         border: 1px solid rgba(128, 128, 128, 0.3);
