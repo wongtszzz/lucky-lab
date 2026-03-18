@@ -87,9 +87,9 @@ tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 # --- TAB 1: STRATEGY OPTIMIZER ---
 with tab1:
     c1, c2 = st.columns([1, 2])
-    t_scan = c1.text_input("Ticker", value="TSM", key="opt_tk_r3").upper()
-    safety_target = c2.slider("Safety %", 70, 99, 90, key="opt_sf_r3")
-    if st.button("🔬 Run Analysis", key="opt_btn_r3"):
+    t_scan = c1.text_input("Ticker", value="TSM", key="opt_tk_final_v1").upper()
+    safety_target = c2.slider("Safety %", 70, 99, 90, key="opt_sf_final_v1")
+    if st.button("🔬 Run Analysis", key="opt_btn_final_v1"):
         with st.spinner("Analyzing..."):
             try:
                 price_data = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=t_scan, feed=DataFeed.IEX))
@@ -113,8 +113,9 @@ with tab1:
 # --- TAB 2: LUCKY LEDGER ---
 with tab2:
     # Summary Metrics
-    raw_val = pd.to_numeric(st.session_state.journal_data["Premium"], errors='coerce').fillna(0).sum()
-    active_count = len(st.session_state.journal_data[st.session_state.journal_data["Status"].astype(str).str.contains("Open", na=False)])
+    current_df = st.session_state.journal_data
+    raw_val = pd.to_numeric(pd.Series(current_df["Premium"]), errors='coerce').fillna(0).sum()
+    active_count = len(current_df[current_df["Status"].astype(str).str.contains("Open", na=False)])
     
     m1, m2 = st.columns(2)
     m1.metric(label="**Total Premium Collected** 🤑", value=f"{int(round(raw_val)):,} (~HKD {int(round(raw_val * 7.8)):,})")
@@ -122,16 +123,16 @@ with tab2:
 
     with st.expander("➕ Log New Trade", expanded=True):
         l1, l2, l3, l4 = st.columns(4)
-        t_log = l1.text_input("Ticker", value="TSM", key="log_tk_r3").upper()
-        type_log = l2.selectbox("Type", ["Short Put", "Short Call"], key="log_ty_r3")
-        qty_log = l3.number_input("Qty", min_value=1, value=1, key="log_q_r3")
-        exp_log = l4.date_input("Expiry", value=datetime.now().date(), key="log_ex_r3")
+        t_log = l1.text_input("Ticker", value="TSM", key="log_tk_final_v1").upper()
+        type_log = l2.selectbox("Type", ["Short Put", "Short Call"], key="log_ty_final_v1")
+        qty_log = l3.number_input("Qty", min_value=1, value=1, key="log_q_final_v1")
+        exp_log = l4.date_input("Expiry", value=datetime.now().date(), key="log_ex_final_v1")
         
         l5, l6 = st.columns(2)
-        stk_log = l5.number_input("Strike", value=None, step=0.5, format="%g", key="log_st_r3")
-        op_log = l6.number_input("Open Price (Sell)", value=None, step=0.01, format="%.2f", key="log_op_r3")
+        stk_log = l5.number_input("Strike", value=None, step=0.5, format="%g", key="log_st_final_v1")
+        op_log = l6.number_input("Open Price (Sell)", value=None, step=0.01, format="%.2f", key="log_op_final_v1")
         
-        if st.button("🚀 Commit Trade", use_container_width=True, key="log_cmt_r3"):
+        if st.button("🚀 Commit Trade", use_container_width=True, key="log_cmt_final_v1"):
             if stk_log and op_log is not None:
                 net = round((float(op_log) * 100 * qty_log) - max(1.05, 0.70 * qty_log), 2)
                 today = datetime.now().date()
@@ -145,7 +146,7 @@ with tab2:
                 st.rerun()
 
     st.write("### History")
-    edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True, key="editor_r3")
+    edited_df = st.data_editor(st.session_state.journal_data, num_rows="dynamic", use_container_width=True, key="editor_final_v1")
     
     if not edited_df.equals(st.session_state.journal_data):
         df = edited_df.copy()
@@ -168,7 +169,7 @@ with tab2:
         save_data(st.session_state.journal_data)
         st.rerun()
 
-    if st.button("🔄 Recalculate Everything", key="recalc_r3"):
+    if st.button("🔄 Recalculate Everything", key="recalc_final_v1"):
         st.rerun()
 
 # --- FOOTER TIMESTAMP ---
