@@ -24,7 +24,8 @@ DB, BKP = "lucky_ledger.csv", "lucky_ledger_backup.csv"
 COLS = ["Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Premium", "Status"]
 
 def save_and_backup(df):
-    df.to_csv(DB, index=False)
+    # Ensure we only save the specific 9 columns to prevent future corruption
+    df[COLS].to_csv(DB, index=False)
     shutil.copy2(DB, BKP)
     st.session_state.last_backup = datetime.now().strftime("%H:%M:%S")
 
@@ -32,19 +33,29 @@ def load_and_clean():
     if not os.path.exists(DB) and os.path.exists(BKP): shutil.copy2(BKP, DB)
     if os.path.exists(DB):
         try:
-            df = pd.read_csv(DB)
-            # 1. Deduplicate column names immediately
-            df = df.loc[:, ~df.columns.duplicated()].copy()
-            # 2. Harmonize column names
-            df = df.rename(columns={"Total Premium Collected": "Premium", "Premium (Total)": "Premium", "Premium (total)": "Premium"})
-            # 3. Ensure all required columns exist
-            for c in COLS:
-                if c not in df.columns: df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium"] else (1 if c == "Qty" else "Unknown")
+            raw_df = pd.read_csv(DB)
+            # FORCE REMOVE DUPLICATE COLUMNS BY NAME
+            df = raw_df.loc[:, ~raw_df.columns.duplicated()].copy()
             
-            # 4. Final sorting logic (Fix for the KeyError)
+            # FORCE RENAME VARIANTS
+            df = df.rename(columns={"Total Premium Collected": "Premium", "Premium (Total)": "Premium", "Premium (total)": "Premium"})
+            
+            # NUCLEAR FIX: If "Premium" is still a DataFrame, force it to the first occurrence only
+            if hasattr(df, "Premium") and isinstance(df["Premium"], pd.DataFrame):
+                premium_values = df["Premium"].iloc[:, 0]
+                df = df.drop(columns="Premium")
+                df["Premium"] = premium_values
+
+            # Ensure every single required column exists as a 1D series
+            for c in COLS:
+                if c not in df.columns:
+                    df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium"] else (1 if c == "Qty" else "Unknown")
+            
+            # Robust Sorting
             df['is_open'] = df['Status'].astype(str).str.contains("Open", case=False, na=False)
             df['exp_dt'] = pd.to_datetime(df['Expiry'], errors='coerce')
             df = df.sort_values(by=['is_open', 'exp_dt'], ascending=[False, False])
+            
             return df[COLS].reset_index(drop=True)
         except:
             return pd.DataFrame(columns=COLS)
@@ -58,9 +69,9 @@ tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 
 with tab1:
     c1, c2 = st.columns([1, 2])
-    tk = c1.text_input("Ticker", value="TSM", key="opt_tk").upper()
-    sf = c2.slider("Safety %", 70, 99, 90, key="opt_sf")
-    if st.button("🔬 Run Analysis", key="opt_run"):
+    tk = c1.text_input("Ticker", value="TSM", key="opt_tk_final").upper()
+    sf = c2.slider("Safety %", 70, 99, 90, key="opt_sf_final")
+    if st.button("🔬 Run Analysis", key="opt_run_final"):
         try:
             px = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=tk, feed=DataFeed.IEX))[tk].ask_price
             exp = datetime.now() + timedelta(days=(4-datetime.now().weekday()+7)%7 or 7)
@@ -79,35 +90,39 @@ with tab1:
         except Exception as e: st.error(f"Error: {e}")
 
 with tab2:
-    df = st.session_state.journal
-    prem = pd.to_numeric(df["Premium"], errors='coerce').sum()
-    active = len(df[df["Status"].astype(str).str.contains("Open", na=False)])
+    # RE-VALIDATE DATA IN SESSION STATE TO PREVENT CRASH
+    df_display = st.session_state.journal.copy()
+    
+    # Force 'Premium' to be numeric and 1D for the metric calculation
+    premium_series = pd.to_numeric(pd.Series(df_display["Premium"].values.flatten()), errors='coerce').fillna(0)
+    total_prem = premium_series.sum()
+    active_count = len(df_display[df_display["Status"].astype(str).str.contains("Open", na=False)])
     
     m1, m2 = st.columns(2)
-    m1.metric("**Total Premium** 🤑", f"{int(round(prem)):,} (~HKD {int(round(prem*7.8)):,})")
-    m2.metric("**Active Trades** 📈", active)
+    m1.metric("**Total Premium** 🤑", f"{int(round(total_prem)):,} (~HKD {int(round(total_prem*7.8)):,})")
+    m2.metric("**Active Trades** 📈", active_count)
 
     with st.expander("➕ Log New Trade"):
         l1, l2, l3, l4 = st.columns(4)
-        n_tk = l1.text_input("Ticker", value="TSM", key="new_tk").upper()
-        n_ty = l2.selectbox("Type", ["Short Put", "Short Call"], key="new_ty")
-        n_qt = l3.number_input("Qty", 1, key="new_qty")
-        n_ex = l4.date_input("Expiry", datetime.now().date(), key="new_ex")
+        n_tk = l1.text_input("Ticker", value="TSM", key="n_tk").upper()
+        n_ty = l2.selectbox("Type", ["Short Put", "Short Call"], key="n_ty")
+        n_qt = l3.number_input("Qty", 1, key="n_qt")
+        n_ex = l4.date_input("Expiry", datetime.now().date(), key="n_ex")
         l5, l6 = st.columns(2)
-        n_st = l5.number_input("Strike", 0.0, step=0.5, key="new_strike")
-        n_op = l6.number_input("Open Price", 0.0, step=0.01, key="new_open")
+        n_st = l5.number_input("Strike", 0.0, step=0.5, key="n_st")
+        n_op = l6.number_input("Open Price", 0.0, step=0.01, key="n_op")
         
         if st.button("🚀 Commit Trade", use_container_width=True):
             net = round((n_op * 100 * n_qt) - max(1.05, 0.70 * n_qt), 2)
             stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Running"
-            new_row = {"Ticker": n_tk, "Type": n_ty, "Strike": n_st, "Expiry": str(n_ex), "Open Price": n_op, "Close Price": 0.0, "Qty": n_qt, "Premium": net, "Status": stat}
-            st.session_state.journal = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            new_row = pd.DataFrame([{"Ticker": n_tk, "Type": n_ty, "Strike": n_st, "Expiry": str(n_ex), "Open Price": n_op, "Close Price": 0.0, "Qty": n_qt, "Premium": net, "Status": stat}])
+            st.session_state.journal = pd.concat([st.session_state.journal, new_row], ignore_index=True)
             save_and_backup(st.session_state.journal); st.rerun()
 
     st.write("### History")
-    edt = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="ledger_editor")
+    edt = st.data_editor(st.session_state.journal, num_rows="dynamic", use_container_width=True, key="ledger_edt_v3")
     
-    if not edt.equals(df):
+    if not edt.equals(st.session_state.journal):
         edt["Open Price"] = pd.to_numeric(edt["Open Price"], errors='coerce').fillna(0)
         edt["Close Price"] = pd.to_numeric(edt["Close Price"], errors='coerce').fillna(0)
         
@@ -122,4 +137,5 @@ with tab2:
         st.session_state.journal = edt
         save_and_backup(edt); st.rerun()
 
-st.markdown(f'<div class="footer">Last Backup: {st.session_state.last_backup if "last_backup" in st.session_state else "Initial"}</div>', unsafe_allow_html=True)
+# --- FOOTER ---
+st.markdown(f'<div class="footer">Last Backup: {st.session_state.get("last_backup", "Initial")}</div>', unsafe_allow_html=True)
