@@ -146,7 +146,7 @@ with tab2:
         l1, l2, l3, l4 = st.columns(4)
         n_tk = l1.text_input("Ticker", value="", placeholder="e.g. AAPL").upper()
         n_ty = l2.selectbox("Type", ["Short Put", "Short Call"])
-        n_qt = l3.number_input("Qty", 1, min_value=1)
+        n_qt = l3.number_input("Qty", value=1, min_value=1)
         n_ex = l4.date_input("Expiry", datetime.now().date())
         
         l5, l6 = st.columns(2)
