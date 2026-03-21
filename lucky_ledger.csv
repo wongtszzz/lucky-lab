@@ -1,3 +1,4 @@
 Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 TSM,Short Put,345.0,2026-02-27,0.59,0.0,1,1.05,57.95,Expired (Win)
 TSM,Short Put,345.0,2026-02-27,0.6,0.0,1,1.05,58.95,Expired (Win)
+TSM,Short Put,345.0,2026-02-27,0.99,0.0,1,1.05,97.95,Expired (Win)
