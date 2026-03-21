@@ -6,7 +6,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-03-11,APP,Short Put,420.0,2026-03-13,1.3,0.0,1,0.05,129.95,Expired (Win)
 2026-03-11,AVGO,Short Put,317.5,2026-03-13,0.65,0.0,1,1.05,63.95,Expired (Win)
 2026-03-10,AVGO,Short Put,325.0,2026-03-11,0.35,0.0,1,0.7,34.3,Expired (Win)
-2026-03-10,MSFT,Short Put,380.0,2026-03-13,0.45,0.03,1,1.05,40.95,Closed (Win)
+2026-03-10,MSFT,Short Put,380.0,2026-03-13,0.45,0.03,1,2.1,39.9,Closed (Win)
 2026-03-09,TSLA,Short Put,340.0,2026-03-11,0.5,0.0,1,0.7,49.3,Expired (Win)
 2026-03-09,GLD,Short Put,445.0,2026-03-11,0.7,0.0,1,1.05,68.95,Expired (Win)
 2026-03-09,NVDA,Short Put,165.0,2026-03-11,0.5,0.0,1,0.7,49.3,Expired (Win)
