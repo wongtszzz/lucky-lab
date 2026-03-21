@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-03-21,TSLA,Short Put,372.5,2026-03-13,0.36,0.0,2,2.1,69.9,Expired (Win)
+2026-03-12,TSLA,Short Put,372.5,2026-03-13,0.36,0.0,2,2.1,69.9,Expired (Win)
 2026-03-12,META,Short Put,620.0,2026-03-13,0.48,0.0,1,1.05,46.95,Expired (Win)
 2026-03-12,ASML,Short Put,1260.0,2026-03-13,1.3,0.0,1,0.25,129.75,Expired (Win)
 2026-03-11,TSM,Short Put,320.0,2026-03-13,0.2,0.0,2,1.4,38.6,Expired (Win)
