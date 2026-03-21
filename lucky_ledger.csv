@@ -1,6 +1,7 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-03-21,JPM,Short Put,267.5,2026-03-20,0.58,0.0,2,2.1,113.9,Expired (Win)
 2026-03-21,TSLA,Short Put,372.5,2026-03-13,0.36,0.0,1,1.05,34.95,Expired (Win)
+2026-03-21,TSLA,Short Put,372.5,2026-03-13,0.36,0.0,1,1.05,34.95,Expired (Win)
 2026-03-14,AVGO,Short Put,297.5,2026-03-16,0.36,0.0,1,0.8,35.2,Expired (Win)
 2026-03-14,META,Short Put,585.0,2026-03-16,0.71,0.0,1,0.77,70.23,Expired (Win)
 2026-03-14,TSLA,Short Put,365.0,2026-03-16,0.41,0.0,1,1.44,39.56,Expired (Win)
