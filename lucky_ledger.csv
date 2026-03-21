@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-03-21,JPM,Short Put,280.0,2026-03-06,0.94,0.0,1,1.05,92.95,Expired (Win)
+2026-03-02,JPM,Short Put,280.0,2026-03-06,0.94,0.0,1,1.05,92.95,Expired (Win)
 2026-02-28,NVDA,Short Put,167.5,2026-03-06,1.0,0.0,1,1.05,98.95,Expired (Win)
 2026-02-28,MU,Short Put,350.0,2026-03-06,1.88,0.0,1,1.05,186.95,Expired (Win)
 2026-02-27,AVGO,Short Put,300.0,2026-02-27,0.95,0.0,1,1.05,93.95,Expired (Win)
