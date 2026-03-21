@@ -1,6 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-03-21,JPM,Short Put,267.5,2026-03-20,0.58,0.0,2,2.1,113.9,Expired (Win)
-2026-03-21,JPM,Short Put,260.0,2026-03-13,0.78,0.0,1,0.7,77.3,Expired (Win)
+2026-03-21,JPM,Short Put,260.0,2026-03-13,0.78,0.02,1,0.7,75.3,Closed (Win)
 2026-03-21,JPM,Short Put,260.0,2026-03-13,0.78,0.0,1,0.7,77.3,Expired (Win)
 2026-03-21,TSM,Short Put,320.0,2026-03-13,0.2,0.0,1,0.7,19.3,Expired (Win)
 2026-03-21,TSM,Short Put,320.0,2026-03-13,0.2,0.0,1,0.7,19.3,Expired (Win)
