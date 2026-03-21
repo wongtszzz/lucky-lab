@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-03-21,META,Short Put,585.0,2026-03-18,0.33,0.0,1,1.05,31.95,Expired (Win)
 2026-03-16,CRWD,Short Put,390.0,2026-03-20,0.8,0.0,1,0.8,79.2,Expired (Win)
 2026-03-16,NVDA,Short Put,170.0,2026-03-18,0.23,0.0,1,0.7,22.3,Expired (Win)
 2026-03-16,NVDA,Short Put,170.0,2026-03-18,0.23,0.0,1,0.7,22.3,Expired (Win)
