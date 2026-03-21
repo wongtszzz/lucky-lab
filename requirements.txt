@@ -1,5 +1,6 @@
 streamlit
-alpaca-py
 pandas
 numpy
 scipy
+alpaca-py
+PyGithub
