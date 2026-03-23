@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-03-23,GLD,Short Call,430.0,2026-03-25,1.3,0.0,1,1.05,128.95,Open / Active
+2026-03-23,GLD,Short Call,430.0,2026-03-25,1.3,0.0,1,0.8,129.2,Open / Active
 2026-03-20,AVGO,Short Put,295.0,2026-03-23,0.38,0.0,1,0.8,37.2,Open / Active
 2026-03-20,TSLA,Short Put,345.0,2026-03-23,0.33,0.0,1,0.63,32.37,Open / Active
 2026-03-20,MU,Short Put,390.0,2026-03-27,4.75,2.75,1,2.1,197.9,Closed (Win)
