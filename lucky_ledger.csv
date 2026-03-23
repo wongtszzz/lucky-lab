@@ -47,7 +47,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-03-06,NVDA,Short Put,170.0,2026-03-09,0.6,0.0,1,0.63,59.37,Expired (Win)
 2026-03-05,GLD,Short Put,447.0,2026-03-09,1.46,0.0,1,0.7,145.3,Expired (Win)
 2026-03-05,CRWD,Short Put,400.0,2026-03-06,1.48,0.0,1,0.8,147.2,Expired (Win)
-2026-03-05,NVDA,Short Put,165.0,2026-03-06,0.63,0.0,1,0.63,62.37,Expired (Win)
+2026-03-03,NVDA,Short Put,165.0,2026-03-06,0.63,0.0,1,0.63,62.37,Expired (Win)
 2026-03-02,GLD,Short Put,450.0,2026-03-06,0.82,0.0,1,1.05,80.95,Expired (Win)
 2026-03-02,JPM,Short Put,280.0,2026-03-06,0.94,0.0,1,0.8,93.2,Expired (Win)
 2026-02-28,NVDA,Short Put,167.5,2026-03-06,1.0,0.0,1,1.05,98.95,Expired (Win)
