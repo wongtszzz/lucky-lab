@@ -160,14 +160,19 @@ with tab2:
     active_count = len(active_df)
     capital_at_risk = (pd.to_numeric(active_df["Strike"]) * 100 * pd.to_numeric(active_df["Qty"])).sum()
     
-    df_j['temp_dt'] = pd.to_datetime(df_j['Date'], errors='coerce')
-    week_ago = datetime.now() - timedelta(days=7)
-    weekly_df = df_j[df_j['temp_dt'] >= week_ago]
-    weekly_profit = weekly_df["Premium"].sum()
+    # NEW LOGIC: This Week's P&L (Monday to Sunday based strictly on Expiry Date)
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday()) # Monday is 0
+    end_of_week = start_of_week + timedelta(days=6) # Sunday is 6
     
-    if not weekly_df.empty:
-        best_row = weekly_df.loc[weekly_df["Premium"].idxmax()]
-        worst_row = weekly_df.loc[weekly_df["Premium"].idxmin()]
+    df_j['temp_exp'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    this_week_df = df_j[(df_j['temp_exp'] >= start_of_week) & (df_j['temp_exp'] <= end_of_week)]
+    
+    weekly_profit = this_week_df["Premium"].sum()
+    
+    if not this_week_df.empty:
+        best_row = this_week_df.loc[this_week_df["Premium"].idxmax()]
+        worst_row = this_week_df.loc[this_week_df["Premium"].idxmin()]
         best_str = f"{best_row['Ticker']} (${best_row['Premium']:.0f})"
         worst_str = f"Worst: {worst_row['Ticker']} (${worst_row['Premium']:.0f})"
     else:
@@ -179,11 +184,11 @@ with tab2:
     r1c2.metric("Active Trades 📈", str(active_count), f"Capital at Risk: ${capital_at_risk:,.0f}", delta_color="off")
     
     r2c1, r2c2 = st.columns(2)
-    r2c1.metric("Weekly Profit (7d) 📅", f"${weekly_profit:,.2f}", "Includes Realized + Unrealized", delta_color="off")
-    r2c2.metric("Top Trade (7d) 🏆", best_str, worst_str, delta_color="off")
+    # Updated text to reflect the Calendar Week
+    r2c1.metric("This Week's P&L (Mon-Sun) 📅", f"${weekly_profit:,.2f}", "Based on Expiry Date", delta_color="off")
+    r2c2.metric("Top Trade (This Week) 🏆", best_str, worst_str, delta_color="off")
 
     with st.expander("➕ Log New Trade", expanded=True):
-        # PRO HACK: We use st.form with clear_on_submit=True. This acts as an automatic delete button for everything!
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3, l4 = st.columns(4)
             
@@ -196,7 +201,6 @@ with tab2:
             n_st = l5.number_input("Strike", value=None, format="%.1f", placeholder="e.g. 150.5")
             n_op = l6.number_input("Open Price", value=None, format="%.2f", placeholder="e.g. 0.85")
             
-            # Replaced st.button with st.form_submit_button
             submitted = st.form_submit_button("🚀 Commit Trade", use_container_width=True, type="primary")
             
             if submitted:
@@ -207,7 +211,7 @@ with tab2:
                     stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Active"
                     new_row = pd.DataFrame([{"Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat}])
                     
-                    st.session_state.journal = pd.concat([df_j.drop(columns=['temp_dt'], errors='ignore'), new_row], ignore_index=True)
+                    st.session_state.journal = pd.concat([df_j.drop(columns=['temp_exp'], errors='ignore'), new_row], ignore_index=True)
                     save_journal(st.session_state.journal)
                     st.rerun()
                 else:
@@ -236,10 +240,10 @@ with tab2:
         return sort_ledger(current_df)
 
     edt = st.data_editor(
-        st.session_state.journal.drop(columns=['temp_dt'], errors='ignore'), 
+        st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v11",
+        key="ledger_editor_v12",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
@@ -250,7 +254,7 @@ with tab2:
         }
     )
 
-    if not edt.equals(st.session_state.journal.drop(columns=['temp_dt'], errors='ignore')):
+    if not edt.equals(st.session_state.journal.drop(columns=['temp_exp'], errors='ignore')):
         updated_df = refresh_calculations(edt)
         st.session_state.journal = updated_df
         save_journal(updated_df)
