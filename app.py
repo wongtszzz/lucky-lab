@@ -172,13 +172,15 @@ with tab1:
                     start_dt = end_dt - timedelta(days=45) 
                     hv = 0.0
                     try:
-                        bar_req = StockBarsRequest(symbol_or_symbols=tk, timeframe=TimeFrame.Day, start=start_dt, end=end_dt)
+                        # PRO FIX: Added feed=DataFeed.IEX so the free tier allows the historical data request!
+                        bar_req = StockBarsRequest(symbol_or_symbols=tk, timeframe=TimeFrame.Day, start=start_dt, end=end_dt, feed=DataFeed.IEX)
                         bars = stock_client.get_stock_bars(bar_req)
                         if tk in bars.df.index.levels[0]:
                             closes = bars.df.loc[tk]['close']
                             daily_returns = closes.pct_change().dropna()
                             hv = daily_returns.std() * np.sqrt(252) * 100 
-                    except: pass 
+                    except Exception as e:
+                        st.warning(f"Could not calculate HV. Ensure {tk} has enough price history.")
                     
                     # 3. Fetch Option Chain
                     chain_req = OptionChainRequest(underlying_symbol=tk, expiration_date=target_ex, feed=OptionsFeed.INDICATIVE)
@@ -192,10 +194,8 @@ with tab1:
                         if opt_filter == "Puts Only" and opt_type == "Call": continue
                         if opt_filter == "Calls Only" and opt_type == "Put": continue
                         
-                        # Filter strictly for Strikes within +/- 10% of Current Price
                         if px * 0.90 <= stk_val <= px * 1.10:
                             
-                            # PRO FIX: Safely dig into the latest_quote folder to find Bid/Ask
                             bid = d.latest_quote.bid_price if d.latest_quote else 0.0
                             ask = d.latest_quote.ask_price if d.latest_quote else 0.0
                             mid = (bid + ask) / 2 if (bid + ask) > 0 else 0.0
@@ -233,7 +233,7 @@ with tab1:
                         
                         st.dataframe(styled_df, use_container_width=True, hide_index=True)
                     else:
-                        st.warning(f"No options found for {tk} expiring on {target_ex}. Try selecting a standard Friday expiration date!")
+                        st.warning(f"No options found for {tk} expiring on {target_ex}.")
                 except Exception as e:
                     st.error(f"Error fetching data: {e}")
 
@@ -334,7 +334,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v16",
+        key="ledger_editor_v17",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
