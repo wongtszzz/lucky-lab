@@ -1,6 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-03-25,GLD,Short Call,430.0,2026-03-27,2.03,0.0,1,0.8,202.2,Open / Active
-2026-03-25,SNDK,Short Call,800.0,2026-03-27,0.4,0.0,1,1.05,38.95,Open / Active
+2026-03-25,SNDK,Short Call,800.0,2026-03-27,0.4,0.0,1,0.05,39.95,Open / Active
 2026-03-24,TSLA,Short Put,365.0,2026-03-31,0.46,0.0,1,1.05,44.95,Open / Active
 2026-03-23,GLD,Short Call,430.0,2026-03-25,1.3,0.0,1,0.8,129.2,Open / Active
 2026-03-23,MU,Short Put,365.0,2026-03-27,1.14,0.0,1,0.8,113.2,Open / Active
