@@ -5,7 +5,6 @@ import io
 import base64
 from datetime import datetime, timedelta
 from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
-# Added StockBarsRequest and TimeFrame to calculate Historical Volatility (HV)
 from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import OptionsFeed, DataFeed
@@ -170,7 +169,7 @@ with tab1:
                     
                     # 2. Calculate 30-Day Historical Volatility (HV)
                     end_dt = datetime.now()
-                    start_dt = end_dt - timedelta(days=45) # Go back 45 days to ensure we hit ~30 trading days
+                    start_dt = end_dt - timedelta(days=45) 
                     hv = 0.0
                     try:
                         bar_req = StockBarsRequest(symbol_or_symbols=tk, timeframe=TimeFrame.Day, start=start_dt, end=end_dt)
@@ -178,9 +177,8 @@ with tab1:
                         if tk in bars.df.index.levels[0]:
                             closes = bars.df.loc[tk]['close']
                             daily_returns = closes.pct_change().dropna()
-                            # Standard formula for annualized historical volatility
                             hv = daily_returns.std() * np.sqrt(252) * 100 
-                    except: pass # Failsafe if Alpaca lacks history for a weird ticker
+                    except: pass 
                     
                     # 3. Fetch Option Chain
                     chain_req = OptionChainRequest(underlying_symbol=tk, expiration_date=target_ex, feed=OptionsFeed.INDICATIVE)
@@ -196,7 +194,12 @@ with tab1:
                         
                         # Filter strictly for Strikes within +/- 10% of Current Price
                         if px * 0.90 <= stk_val <= px * 1.10:
-                            mid = (d.bid_price + d.ask_price) / 2
+                            
+                            # PRO FIX: Safely dig into the latest_quote folder to find Bid/Ask
+                            bid = d.latest_quote.bid_price if d.latest_quote else 0.0
+                            ask = d.latest_quote.ask_price if d.latest_quote else 0.0
+                            mid = (bid + ask) / 2 if (bid + ask) > 0 else 0.0
+                            
                             delta = d.greeks.delta if d.greeks and d.greeks.delta is not None else 0.0
                             iv = d.implied_volatility if d.implied_volatility is not None else 0.0
                             roc = (mid / stk_val) * 100 if stk_val > 0 else 0.0
@@ -216,7 +219,6 @@ with tab1:
                     if res:
                         df_res = pd.DataFrame(res).sort_values(by=["Type", "Strike"], ascending=[False, False])
                         
-                        # PRO HACK: Function to highlight the entire row if it meets your two conditions
                         def highlight_golden_trades(row):
                             try:
                                 is_golden = (0.0 < abs(float(row['Delta'])) < 0.15) and (float(row['IV %']) > 50.0)
@@ -225,14 +227,13 @@ with tab1:
                             except: pass
                             return [''] * len(row)
                             
-                        # Apply the row highlighter and format the currency column cleanly
                         styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
                             "Mid Price": "${:.2f}"
                         })
                         
                         st.dataframe(styled_df, use_container_width=True, hide_index=True)
                     else:
-                        st.warning(f"No options found for {tk} expiring on {target_ex}.")
+                        st.warning(f"No options found for {tk} expiring on {target_ex}. Try selecting a standard Friday expiration date!")
                 except Exception as e:
                     st.error(f"Error fetching data: {e}")
 
@@ -333,7 +334,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v15",
+        key="ledger_editor_v16",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
