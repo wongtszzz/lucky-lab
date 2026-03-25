@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 import io
 import base64
-from scipy.stats import norm
 from datetime import datetime, timedelta
 from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
-from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest
+# Added StockBarsRequest and TimeFrame to calculate Historical Volatility (HV)
+from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest, StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
 
@@ -112,39 +113,130 @@ if 'journal' not in st.session_state or set(st.session_state.journal.columns) !=
 # --- 3. UI TABS ---
 tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 
-# --- OPTIMIZER ---
+# --- OPTIMIZER (50/50 Market & Strategy Split) ---
 with tab1:
-    st.write("Calculates short put probabilities using Black-Scholes.")
-    c1, c2, c3 = st.columns(3)
-    tk = c1.text_input("Ticker", value="TSM").upper()
-    sf = c2.slider("Safety %", 70, 99, 90)
-    iv_input = c3.slider("IV %", 10, 200, 30) 
+    col_market, col_opt = st.columns(2, gap="large")
     
-    if st.button("🔬 Run Analysis", type="primary"):
-        with st.spinner("Fetching data..."):
-            try:
-                px = stock_client.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=tk, feed=DataFeed.IEX))[tk].ask_price
-                exp = datetime.now() + timedelta(days=(4-datetime.now().weekday()+7)%7 or 7)
-                chain = opt_client.get_option_chain(OptionChainRequest(underlying_symbol=tk, expiration_date=exp.date(), feed=OptionsFeed.INDICATIVE))
-                res = []
-                iv_decimal = iv_input / 100.0
-                for s, d in chain.items():
-                    stk_val = float(s[-8:])/1000
-                    if "P" in s and stk_val < px:
-                        d2 = (np.log(px/stk_val) + (0.04 - 0.5 * iv_decimal**2)*(7/365)) / (iv_decimal * np.sqrt(7/365))
-                        prob = norm.cdf(d2) * 100
-                        if prob >= sf:
-                            mid = (d.bid_price + d.ask_price) / 2
-                            res.append({"Strike": stk_val, "Safety %": round(prob, 1), "Premium": round(mid, 2), "Est. Income": round(mid*100, 2)})
-                st.success(f"**{tk} Price:** ${px:.2f} | **Expiry:** {exp.date()}")
-                if res: 
-                    st.dataframe(pd.DataFrame(res).sort_values("Strike", ascending=False), use_container_width=True)
-                else: 
-                    st.warning("No matches.")
-            except Exception as e: 
-                st.error(f"Error: {e}")
+    # --- LEFT SIDE: MARKET PULSE ---
+    with col_market:
+        st.markdown("#### 📊 Market Pulse")
+        st.caption("Live snapshot of broader market trends and volatility.")
+        
+        try:
+            req = StockSnapshotRequest(symbol_or_symbols=["SPY", "QQQ", "IWM", "VIXY"], feed=DataFeed.IEX)
+            snaps = stock_client.get_stock_snapshot(req)
+            
+            def get_metrics(tk):
+                if tk in snaps and snaps[tk].previous_daily_bar:
+                    curr = snaps[tk].latest_trade.price if snaps[tk].latest_trade and snaps[tk].latest_trade.price > 0 else snaps[tk].latest_quote.ask_price
+                    prev = snaps[tk].previous_daily_bar.close
+                    pct = ((curr - prev) / prev) * 100
+                    return curr, pct
+                return 0.0, 0.0
+            
+            spy_p, spy_pct = get_metrics("SPY")
+            qqq_p, qqq_pct = get_metrics("QQQ")
+            iwm_p, iwm_pct = get_metrics("IWM")
+            vixy_p, vixy_pct = get_metrics("VIXY")
+            
+            m1, m2 = st.columns(2)
+            m1.metric("S&P 500 (SPY)", f"${spy_p:.2f}", f"{spy_pct:+.2f}%")
+            m2.metric("Nasdaq (QQQ)", f"${qqq_p:.2f}", f"{qqq_pct:+.2f}%")
+            
+            m3, m4 = st.columns(2)
+            m3.metric("Russell 2000 (IWM)", f"${iwm_p:.2f}", f"{iwm_pct:+.2f}%")
+            m4.metric("Volatility (VIXY)", f"${vixy_p:.2f}", f"{vixy_pct:+.2f}%", delta_color="inverse")
+            
+            st.info("💡 **Pro Tip:** When Volatility (VIXY) is deeply green, option premiums are richer. This is usually the best time to sell puts on stocks you want to own.")
+        except Exception as e:
+            st.warning(f"Could not load live market data at this time.")
 
-# --- LEDGER ---
+    # --- RIGHT SIDE: OPTIONS CHAIN SCANNER ---
+    with col_opt:
+        st.markdown("#### 🎯 Options Chain Scanner")
+        st.caption("Find the best premiums within ±10% of the current price.")
+        
+        c1, c2, c3 = st.columns(3)
+        tk = c1.text_input("Ticker", value="TSM").upper()
+        target_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=30))
+        opt_filter = c3.selectbox("Show", ["Puts Only", "Calls Only", "Both"])
+        
+        if st.button("🔬 Scan Chain", type="primary", use_container_width=True):
+            with st.spinner(f"Scanning {tk} live chain and calculating Volatility..."):
+                try:
+                    # 1. Fetch Latest Price
+                    px_req = StockLatestQuoteRequest(symbol_or_symbols=tk, feed=DataFeed.IEX)
+                    px = stock_client.get_stock_latest_quote(px_req)[tk].ask_price
+                    
+                    # 2. Calculate 30-Day Historical Volatility (HV)
+                    end_dt = datetime.now()
+                    start_dt = end_dt - timedelta(days=45) # Go back 45 days to ensure we hit ~30 trading days
+                    hv = 0.0
+                    try:
+                        bar_req = StockBarsRequest(symbol_or_symbols=tk, timeframe=TimeFrame.Day, start=start_dt, end=end_dt)
+                        bars = stock_client.get_stock_bars(bar_req)
+                        if tk in bars.df.index.levels[0]:
+                            closes = bars.df.loc[tk]['close']
+                            daily_returns = closes.pct_change().dropna()
+                            # Standard formula for annualized historical volatility
+                            hv = daily_returns.std() * np.sqrt(252) * 100 
+                    except: pass # Failsafe if Alpaca lacks history for a weird ticker
+                    
+                    # 3. Fetch Option Chain
+                    chain_req = OptionChainRequest(underlying_symbol=tk, expiration_date=target_ex, feed=OptionsFeed.INDICATIVE)
+                    chain = opt_client.get_option_chain(chain_req)
+                    
+                    res = []
+                    for s, d in chain.items():
+                        stk_val = float(s[-8:])/1000
+                        opt_type = "Put" if "P" in s else "Call"
+                        
+                        if opt_filter == "Puts Only" and opt_type == "Call": continue
+                        if opt_filter == "Calls Only" and opt_type == "Put": continue
+                        
+                        # Filter strictly for Strikes within +/- 10% of Current Price
+                        if px * 0.90 <= stk_val <= px * 1.10:
+                            mid = (d.bid_price + d.ask_price) / 2
+                            delta = d.greeks.delta if d.greeks and d.greeks.delta is not None else 0.0
+                            iv = d.implied_volatility if d.implied_volatility is not None else 0.0
+                            roc = (mid / stk_val) * 100 if stk_val > 0 else 0.0
+                            
+                            res.append({
+                                "Type": opt_type,
+                                "Strike": stk_val,
+                                "Delta": round(delta, 3),
+                                "Mid Price": round(mid, 2),
+                                "ROC %": round(roc, 2),
+                                "IV %": round(iv * 100, 1)
+                            })
+                            
+                    st.success(f"**{tk} Current Price:** ${px:.2f} | **30-Day HV:** {hv:.1f}%")
+                    st.caption("🟢 **Highlighted Rows:** Delta < 15% AND Implied Volatility (IV) > 50%")
+                    
+                    if res:
+                        df_res = pd.DataFrame(res).sort_values(by=["Type", "Strike"], ascending=[False, False])
+                        
+                        # PRO HACK: Function to highlight the entire row if it meets your two conditions
+                        def highlight_golden_trades(row):
+                            try:
+                                is_golden = (0.0 < abs(float(row['Delta'])) < 0.15) and (float(row['IV %']) > 50.0)
+                                if is_golden:
+                                    return ['background-color: rgba(39, 174, 96, 0.4); font-weight: bold;'] * len(row)
+                            except: pass
+                            return [''] * len(row)
+                            
+                        # Apply the row highlighter and format the currency column cleanly
+                        styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
+                            "Mid Price": "${:.2f}"
+                        })
+                        
+                        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                    else:
+                        st.warning(f"No options found for {tk} expiring on {target_ex}.")
+                except Exception as e:
+                    st.error(f"Error fetching data: {e}")
+
+# --- LEDGER (100% UNTOUCHED) ---
 with tab2:
     df_j = st.session_state.journal
     
@@ -160,10 +252,9 @@ with tab2:
     active_count = len(active_df)
     capital_at_risk = (pd.to_numeric(active_df["Strike"]) * 100 * pd.to_numeric(active_df["Qty"])).sum()
     
-    # NEW LOGIC: This Week's P&L (Monday to Sunday based strictly on Expiry Date)
     today = datetime.now().date()
-    start_of_week = today - timedelta(days=today.weekday()) # Monday is 0
-    end_of_week = start_of_week + timedelta(days=6) # Sunday is 6
+    start_of_week = today - timedelta(days=today.weekday()) 
+    end_of_week = start_of_week + timedelta(days=6) 
     
     df_j['temp_exp'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
     this_week_df = df_j[(df_j['temp_exp'] >= start_of_week) & (df_j['temp_exp'] <= end_of_week)]
@@ -184,7 +275,6 @@ with tab2:
     r1c2.metric("Active Trades 📈", str(active_count), f"Capital at Risk: ${capital_at_risk:,.0f}", delta_color="off")
     
     r2c1, r2c2 = st.columns(2)
-    # Updated text to reflect the Calendar Week
     r2c1.metric("This Week's P&L (Mon-Sun) 📅", f"${weekly_profit:,.2f}", "Based on Expiry Date", delta_color="off")
     r2c2.metric("Top Trade (This Week) 🏆", best_str, worst_str, delta_color="off")
 
@@ -243,7 +333,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v12",
+        key="ledger_editor_v15",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
