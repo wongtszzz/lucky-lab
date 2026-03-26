@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-03-26,TSM,Short Put,312.5,2026-03-27,0.18,0.0,1,1.05,16.95,Open / Active
+2026-03-26,TSM,Short Put,312.5,2026-03-27,0.18,0.0,1,0.8,17.2,Open / Active
 2026-03-26,TSM,Short Put,317.5,2026-03-27,0.38,0.0,1,1.05,36.95,Open / Active
 2026-03-25,GLD,Short Call,430.0,2026-03-27,2.03,0.0,1,0.8,202.2,Open / Active
 2026-03-25,SNDK,Short Call,800.0,2026-03-27,0.4,0.0,1,0.05,39.95,Open / Active
