@@ -119,14 +119,20 @@ with tab1:
     
     # --- LEFT SIDE: MARKET PULSE (Dual-Engine Fallback) ---
     with col_market:
-        st.markdown("#### 📊 Market Pulse")
-        st.caption("Live snapshot of broader market trends and volatility.")
+        # PRO HACK: We put the header and the refresh button on the same line using columns
+        head_col, btn_col = st.columns([3, 1])
+        with head_col:
+            st.markdown("#### 📊 Market Pulse")
+        with btn_col:
+            # Clicking this forces Streamlit to re-run the script and fetch fresh data
+            st.button("🔄 Refresh", use_container_width=True)
+            
+        st.caption("Live snapshot of broader market trends and true index volatility.")
         
         try:
             # ENGINE 1: Try Yahoo Finance for the True Indices first
             def get_yf_metrics(symbol):
                 t = yf.Ticker(symbol)
-                # Use 5d to ensure we don't get empty data over weekends/holidays
                 df = t.history(period='5d')
                 if len(df) >= 2:
                     prev = float(df['Close'].iloc[-2])
@@ -137,7 +143,6 @@ with tab1:
             
             spy_p, spy_pct = get_yf_metrics("^GSPC")
             
-            # If Yahoo returns 0.0, it means the IP is blocked. Force the fallback!
             if spy_p == 0.0:
                 raise ValueError("Yahoo Finance returned empty data (IP timeout).")
                 
@@ -362,7 +367,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v19",
+        key="ledger_editor_v20",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
