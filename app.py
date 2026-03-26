@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import io
 import base64
-import yfinance as yf  # PRO HACK: The true index data engine!
+import yfinance as yf
 from datetime import datetime, timedelta
 from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
-from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockBarsRequest
+from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
@@ -117,33 +117,33 @@ tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 with tab1:
     col_market, col_opt = st.columns(2, gap="large")
     
-    # --- LEFT SIDE: MARKET PULSE (Powered by Yahoo Finance) ---
+    # --- LEFT SIDE: MARKET PULSE (Dual-Engine Fallback) ---
     with col_market:
         st.markdown("#### 📊 Market Pulse")
-        st.caption("Live snapshot of broader market trends and true index volatility.")
+        st.caption("Live snapshot of broader market trends and volatility.")
         
         try:
+            # ENGINE 1: Try Yahoo Finance for the True Indices first
             def get_yf_metrics(symbol):
-                # Pulls the last 2 days of history to calculate the daily % change
                 t = yf.Ticker(symbol)
-                todays_data = t.history(period='2d')
-                if len(todays_data) >= 2:
-                    prev = todays_data['Close'].iloc[0]
-                    curr = todays_data['Close'].iloc[-1]
+                # Use 5d to ensure we don't get empty data over weekends/holidays
+                df = t.history(period='5d')
+                if len(df) >= 2:
+                    prev = float(df['Close'].iloc[-2])
+                    curr = float(df['Close'].iloc[-1])
                     pct = ((curr - prev) / prev) * 100
-                    return curr, pct
-                elif len(todays_data) == 1:
-                    prev = todays_data['Open'].iloc[0]
-                    curr = todays_data['Close'].iloc[0]
-                    pct = ((curr - prev) / prev) * 100 if prev > 0 else 0.0
                     return curr, pct
                 return 0.0, 0.0
             
-            # Fetching the TRUE indices!
-            spy_p, spy_pct = get_yf_metrics("^GSPC")  # S&P 500 Index
-            qqq_p, qqq_pct = get_yf_metrics("^IXIC")  # Nasdaq Composite
-            iwm_p, iwm_pct = get_yf_metrics("^RUT")   # Russell 2000
-            vix_p, vix_pct = get_yf_metrics("^VIX")   # The REAL VIX
+            spy_p, spy_pct = get_yf_metrics("^GSPC")
+            
+            # If Yahoo returns 0.0, it means the IP is blocked. Force the fallback!
+            if spy_p == 0.0:
+                raise ValueError("Yahoo Finance returned empty data (IP timeout).")
+                
+            qqq_p, qqq_pct = get_yf_metrics("^IXIC")
+            iwm_p, iwm_pct = get_yf_metrics("^RUT")
+            vix_p, vix_pct = get_yf_metrics("^VIX")
             
             m1, m2 = st.columns(2)
             m1.metric("S&P 500", f"{spy_p:,.2f}", f"{spy_pct:+.2f}%")
@@ -152,12 +152,40 @@ with tab1:
             m3, m4 = st.columns(2)
             m3.metric("Russell 2000", f"{iwm_p:,.2f}", f"{iwm_pct:+.2f}%")
             m4.metric("Volatility (VIX)", f"{vix_p:,.2f}", f"{vix_pct:+.2f}%", delta_color="inverse")
-            
-            st.info("💡 **Pro Tip:** When the real VIX spikes green (above 20), option premiums become rich. It's the ideal time to hunt for short put setups.")
-        except Exception as e:
-            st.warning(f"Could not load live market data from Yahoo Finance at this time.")
+            st.info("💡 **Pro Tip:** When the real VIX spikes green (above 20), option premiums become rich.")
 
-    # --- RIGHT SIDE: OPTIONS CHAIN SCANNER (Powered by Alpaca) ---
+        except Exception as e:
+            # ENGINE 2: The Fallback to Alpaca ETFs
+            st.caption("*(Yahoo Timeout - Auto-switched to Alpaca ETF Feed)*")
+            try:
+                req = StockSnapshotRequest(symbol_or_symbols=["SPY", "QQQ", "IWM", "VIXY"], feed=DataFeed.IEX)
+                snaps = stock_client.get_stock_snapshot(req)
+                
+                def get_alpaca_metrics(tk):
+                    if tk in snaps and snaps[tk].previous_daily_bar:
+                        curr = snaps[tk].latest_trade.price if snaps[tk].latest_trade and snaps[tk].latest_trade.price > 0 else snaps[tk].latest_quote.ask_price
+                        prev = snaps[tk].previous_daily_bar.close
+                        pct = ((curr - prev) / prev) * 100
+                        return curr, pct
+                    return 0.0, 0.0
+                
+                spy_p, spy_pct = get_alpaca_metrics("SPY")
+                qqq_p, qqq_pct = get_alpaca_metrics("QQQ")
+                iwm_p, iwm_pct = get_alpaca_metrics("IWM")
+                vixy_p, vixy_pct = get_alpaca_metrics("VIXY")
+                
+                m1, m2 = st.columns(2)
+                m1.metric("S&P 500 (SPY)", f"${spy_p:.2f}", f"{spy_pct:+.2f}%")
+                m2.metric("Nasdaq (QQQ)", f"${qqq_p:.2f}", f"{qqq_pct:+.2f}%")
+                
+                m3, m4 = st.columns(2)
+                m3.metric("Russell 2000 (IWM)", f"${iwm_p:.2f}", f"{iwm_pct:+.2f}%")
+                m4.metric("Volatility (VIXY)", f"${vixy_p:.2f}", f"{vixy_pct:+.2f}%", delta_color="inverse")
+                st.info("💡 **Pro Tip:** When Volatility (VIXY) is deeply green, option premiums are richer.")
+            except:
+                st.warning("All market data feeds are currently down.")
+
+    # --- RIGHT SIDE: OPTIONS CHAIN SCANNER ---
     with col_opt:
         st.markdown("#### 🎯 Options Chain Scanner")
         st.caption("Find the best premiums within ±10% of the current price.")
@@ -334,7 +362,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v18",
+        key="ledger_editor_v19",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
