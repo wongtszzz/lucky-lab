@@ -166,11 +166,12 @@ with tab1:
         except Exception as e:
             st.caption("*(Yahoo Timeout - Auto-switched to Alpaca ETF Feed)*")
             try:
-                req = StockLatestQuoteRequest(symbol_or_symbols=["SPY", "VIXY"], feed=DataFeed.IEX)
-                quotes = stock_client.get_stock_latest_quote(req)
+                # PRO FIX: Use Snapshot for the fallback to avoid the weekend ask_price trap
+                req = StockSnapshotRequest(symbol_or_symbols=["SPY", "VIXY"], feed=DataFeed.IEX)
+                snaps = stock_client.get_stock_snapshot(req)
                 
-                spy_px = quotes["SPY"].ask_price if quotes["SPY"].ask_price > 0 else 0.0
-                vixy_px = quotes["VIXY"].ask_price if quotes["VIXY"].ask_price > 0 else 0.0
+                spy_px = snaps["SPY"].latest_trade.price if snaps["SPY"].latest_trade else snaps["SPY"].previous_daily_bar.close
+                vixy_px = snaps["VIXY"].latest_trade.price if snaps["VIXY"].latest_trade else snaps["VIXY"].previous_daily_bar.close
                 
                 current_vix = vixy_px * 1.5 
                 market_daily_expected_pct = current_vix / np.sqrt(252)
@@ -202,11 +203,20 @@ with tab1:
         if st.button("🔬 Analyze & Scan", type="primary", use_container_width=True):
             with st.spinner(f"Running Smart Target Math for {tk}..."):
                 try:
-                    px_req = StockLatestQuoteRequest(symbol_or_symbols=tk, feed=DataFeed.IEX)
-                    px = stock_client.get_stock_latest_quote(px_req)[tk].ask_price
+                    # PRO FIX: Use Yahoo Finance to get the TRUE closing price!
+                    yf_tk = yf.Ticker(tk)
+                    hist_df = yf_tk.history(period='5d')
+                    
+                    if not hist_df.empty:
+                        px = float(hist_df['Close'].iloc[-1])
+                    else:
+                        # Fallback to Alpaca Last Trade Price (Avoids the ask_price trap)
+                        snap_req = StockSnapshotRequest(symbol_or_symbols=[tk], feed=DataFeed.IEX)
+                        snap = stock_client.get_stock_snapshot(snap_req)[tk]
+                        px = snap.latest_trade.price if snap.latest_trade and snap.latest_trade.price > 0 else snap.previous_daily_bar.close
                     
                     try:
-                        beta = yf.Ticker(tk).info.get('beta', 1.0)
+                        beta = yf_tk.info.get('beta', 1.0)
                         if beta is None: beta = 1.0
                     except:
                         beta = 1.0
@@ -323,13 +333,11 @@ with tab_chart:
                     if df_chart.empty:
                         st.error(f"Could not pull chart data for {chart_tk}.")
                     else:
-                        # 1. EMAs
                         df_chart['EMA_20'] = df_chart['Close'].ewm(span=20, adjust=False).mean()
                         df_chart['EMA_50'] = df_chart['Close'].ewm(span=50, adjust=False).mean()
                         df_chart['EMA_100'] = df_chart['Close'].ewm(span=100, adjust=False).mean()
                         df_chart['EMA_200'] = df_chart['Close'].ewm(span=200, adjust=False).mean()
                         
-                        # 2. ATR
                         high_low = df_chart['High'] - df_chart['Low']
                         high_close = np.abs(df_chart['High'] - df_chart['Close'].shift())
                         low_close = np.abs(df_chart['Low'] - df_chart['Close'].shift())
@@ -340,7 +348,6 @@ with tab_chart:
                         current_atr = df_chart['ATR_14'].iloc[-1]
                         atr_placeholder.metric("14-Day ATR", f"${current_atr:.2f}", help="The average dollar amount this stock moves per day.")
                         
-                        # 3. Keltner Channels
                         df_chart['KC_Upper'] = df_chart['EMA_20'] + (2 * df_chart['ATR_14'])
                         df_chart['KC_Lower'] = df_chart['EMA_20'] - (2 * df_chart['ATR_14'])
                         
@@ -351,7 +358,6 @@ with tab_chart:
                         c_kcu = df_chart['KC_Upper'].iloc[-1]
                         c_kcl = df_chart['KC_Lower'].iloc[-1]
                         
-                        # 4. Support / Resistance
                         resistance = df_chart['High'].max()
                         support = df_chart['Low'].min()
                         current_close = df_chart['Close'].iloc[-1]
@@ -364,7 +370,6 @@ with tab_chart:
                                             vertical_spacing=0.03, subplot_titles=(f'{chart_tk} Price Action', 'Volume'),
                                             row_width=[0.2, 0.7]) 
 
-                        # Candlesticks
                         fig.add_trace(go.Candlestick(
                             x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
                             low=df_chart['Low'], close=df_chart['Close'], name=f'Price: ${current_close:.2f}',
@@ -413,7 +418,7 @@ with tab_chart:
                             ),
                             xaxis_rangeslider_visible=False,
                             bargap=0.1,
-                            hovermode="x unified" # PRO HACK: Creates the TradingView style crosshair HUD!
+                            hovermode="x unified" 
                         )
                         
                         st.plotly_chart(fig, use_container_width=True)
@@ -517,7 +522,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v33",
+        key="ledger_editor_v34",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
