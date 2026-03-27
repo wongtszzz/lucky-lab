@@ -311,14 +311,12 @@ with tab_chart:
         draw_btn = st.button("📊 Draw Chart", use_container_width=True, type="primary")
         
         st.write("---")
-        # Placeholder for dynamic ATR reading
         atr_placeholder = st.empty()
         
     with chart_col2:
         if draw_btn:
             with st.spinner(f"Crunching technicals and generating chart for {chart_tk}..."):
                 try:
-                    # Bumped up to 1 year of data so the 200 EMA can calculate accurately!
                     ticker_data = yf.Ticker(chart_tk)
                     df_chart = ticker_data.history(period="1y")
                     
@@ -331,7 +329,7 @@ with tab_chart:
                         df_chart['EMA_100'] = df_chart['Close'].ewm(span=100, adjust=False).mean()
                         df_chart['EMA_200'] = df_chart['Close'].ewm(span=200, adjust=False).mean()
                         
-                        # 2. Average True Range (ATR - 14 Day)
+                        # 2. ATR
                         high_low = df_chart['High'] - df_chart['Low']
                         high_close = np.abs(df_chart['High'] - df_chart['Close'].shift())
                         low_close = np.abs(df_chart['Low'] - df_chart['Close'].shift())
@@ -342,52 +340,62 @@ with tab_chart:
                         current_atr = df_chart['ATR_14'].iloc[-1]
                         atr_placeholder.metric("14-Day ATR", f"${current_atr:.2f}", help="The average dollar amount this stock moves per day.")
                         
-                        # 3. Keltner Channels (20 EMA +/- 2*ATR)
+                        # 3. Keltner Channels
                         df_chart['KC_Upper'] = df_chart['EMA_20'] + (2 * df_chart['ATR_14'])
                         df_chart['KC_Lower'] = df_chart['EMA_20'] - (2 * df_chart['ATR_14'])
                         
-                        # 4. Support / Resistance (using the whole 1y period for major levels)
+                        c_ema20 = df_chart['EMA_20'].iloc[-1]
+                        c_ema50 = df_chart['EMA_50'].iloc[-1]
+                        c_ema100 = df_chart['EMA_100'].iloc[-1]
+                        c_ema200 = df_chart['EMA_200'].iloc[-1]
+                        c_kcu = df_chart['KC_Upper'].iloc[-1]
+                        c_kcl = df_chart['KC_Lower'].iloc[-1]
+                        
+                        # 4. Support / Resistance
                         resistance = df_chart['High'].max()
                         support = df_chart['Low'].min()
                         current_close = df_chart['Close'].iloc[-1]
                         
-                        # Determine Volume Colors
-                        vol_colors = ['rgba(39, 174, 96, 0.7)' if row['Close'] >= row['Open'] else 'rgba(231, 76, 60, 0.7)' for index, row in df_chart.iterrows()]
+                        bull_color = '#26A69A' 
+                        bear_color = '#EF5350' 
+                        vol_colors = [bull_color if row['Close'] >= row['Open'] else bear_color for index, row in df_chart.iterrows()]
                         
                         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                                            vertical_spacing=0.03, subplot_titles=(f'{chart_tk} 1-Year Price Action', 'Volume'),
+                                            vertical_spacing=0.03, subplot_titles=(f'{chart_tk} Price Action', 'Volume'),
                                             row_width=[0.2, 0.7]) 
 
                         # Candlesticks
                         fig.add_trace(go.Candlestick(
                             x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
-                            low=df_chart['Low'], close=df_chart['Close'], name='Price'
+                            low=df_chart['Low'], close=df_chart['Close'], name=f'Price: ${current_close:.2f}',
+                            increasing_line_color=bull_color, decreasing_line_color=bear_color
                         ), row=1, col=1)
 
-                        # Toggled Fast EMAs
                         if show_ema_fast:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_20'], mode='lines', name='20 EMA', line=dict(color='blue', width=1.5)), row=1, col=1)
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_50'], mode='lines', name='50 EMA', line=dict(color='orange', width=1.5)), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_20'], mode='lines', name=f'20 EMA: ${c_ema20:.2f}', line=dict(color='#2962FF', width=1.5)), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_50'], mode='lines', name=f'50 EMA: ${c_ema50:.2f}', line=dict(color='#FF6D00', width=1.5)), row=1, col=1)
 
-                        # Toggled Slow EMAs
                         if show_ema_slow:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_100'], mode='lines', name='100 EMA', line=dict(color='purple', width=1.5)), row=1, col=1)
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_200'], mode='lines', name='200 EMA', line=dict(color='black', width=2)), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_100'], mode='lines', name=f'100 EMA: ${c_ema100:.2f}', line=dict(color='#9C27B0', width=1.5)), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_200'], mode='lines', name=f'200 EMA: ${c_ema200:.2f}', line=dict(color='#212121', width=2)), row=1, col=1)
 
-                        # Toggled Keltner Channels
                         if show_kc:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['KC_Upper'], mode='lines', name='KC Upper', line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dot')), row=1, col=1)
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['KC_Lower'], mode='lines', name='KC Lower', line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dot'), fill='tonexty', fillcolor='rgba(128, 128, 128, 0.05)'), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['KC_Upper'], mode='lines', name=f'KC Upper: ${c_kcu:.2f}', line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dot')), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['KC_Lower'], mode='lines', name=f'KC Lower: ${c_kcl:.2f}', line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dot'), fill='tonexty', fillcolor='rgba(128, 128, 128, 0.05)'), row=1, col=1)
 
-                        # Toggled Support/Resistance
                         if show_sr:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=[resistance] * len(df_chart), mode='lines', name='Resistance', line=dict(color='red', width=2, dash='dash')), row=1, col=1)
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=[support] * len(df_chart), mode='lines', name='Support', line=dict(color='green', width=2, dash='dash')), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=[resistance] * len(df_chart), mode='lines', name=f'Resist: ${resistance:.2f}', line=dict(color=bear_color, width=2, dash='dash')), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=[support] * len(df_chart), mode='lines', name=f'Support: ${support:.2f}', line=dict(color=bull_color, width=2, dash='dash')), row=1, col=1)
 
-                        # Volume
                         fig.add_trace(go.Bar(
-                            x=df_chart.index, y=df_chart['Volume'], name='Volume', marker_color=vol_colors
+                            x=df_chart.index, y=df_chart['Volume'], name='Volume', marker_color=vol_colors, marker_line_width=0
                         ), row=2, col=1)
+
+                        fig.update_xaxes(
+                            rangebreaks=[dict(bounds=["sat", "mon"])],
+                            showgrid=False, zeroline=False
+                        )
+                        fig.update_yaxes(showgrid=True, gridcolor='rgba(128,128,128,0.1)', zeroline=False)
 
                         fig.update_layout(
                             title=f"{chart_tk} Technical Analysis | Current Price: ${current_close:.2f}",
@@ -395,11 +403,19 @@ with tab_chart:
                             height=750,
                             margin=dict(l=0, r=0, t=60, b=0),
                             showlegend=True, 
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                            xaxis_rangeslider_visible=False 
+                            legend=dict(
+                                orientation="h", 
+                                yanchor="bottom", 
+                                y=1.02, 
+                                xanchor="right", 
+                                x=1,
+                                traceorder="normal"
+                            ),
+                            xaxis_rangeslider_visible=False,
+                            bargap=0.1,
+                            hovermode="x unified" # PRO HACK: Creates the TradingView style crosshair HUD!
                         )
                         
-                        fig.update_xaxes(rangeslider_visible=False)
                         st.plotly_chart(fig, use_container_width=True)
                 except Exception as e:
                     st.error(f"Error generating chart: {e}")
@@ -501,7 +517,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v30",
+        key="ledger_editor_v33",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
