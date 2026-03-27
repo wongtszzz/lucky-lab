@@ -4,6 +4,8 @@ import numpy as np
 import io
 import base64
 import yfinance as yf
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
 from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest, StockBarsRequest
@@ -115,13 +117,12 @@ current_vix = 20.0
 market_daily_expected_pct = 0.0
 
 # --- 3. UI TABS ---
-tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
+tab1, tab_chart, tab2 = st.tabs(["🔍 Strategy Optimizer", "📈 Chart Analysis", "📓 Lucky Ledger"])
 
 # --- OPTIMIZER (50/50 Market & Strategy Split) ---
 with tab1:
     col_market, col_opt = st.columns(2, gap="large")
     
-    # --- LEFT SIDE: THE MARKET ORACLE (Expected Move) ---
     with col_market:
         head_col, btn_col = st.columns([3, 1])
         with head_col:
@@ -189,13 +190,12 @@ with tab1:
             except:
                 st.warning("All market data feeds are currently down.")
 
-    # --- RIGHT SIDE: OPTIONS CHAIN SCANNER ---
     with col_opt:
         st.markdown("#### 🎯 Smart Targeting Engine")
         st.caption("Calculates the exact Safe Zone for your specific Expiry Date.")
         
         c1, c2, c3 = st.columns(3)
-        tk = c1.text_input("Ticker", value="TSM").upper()
+        tk = c1.text_input("Ticker", value="TSM", key="scanner_tk").upper()
         target_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
         opt_filter = c3.selectbox("Show", ["Puts Only", "Calls Only", "Both"])
         
@@ -277,7 +277,6 @@ with tab1:
                             except: pass
                             return [''] * len(row)
                             
-                        # PRO FIX: Strictly enforce decimal formatting to strip all messy trailing zeros!
                         styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
                             "Strike": "{:.2f}",
                             "Delta": "{:.3f}",
@@ -292,6 +291,120 @@ with tab1:
                         st.warning(f"No options found for {tk} expiring on {target_ex}.")
                 except Exception as e:
                     st.error(f"Error fetching data: {e}")
+
+# --- NEW TAB: CHART ANALYSIS ---
+with tab_chart:
+    st.markdown("#### 📈 Technical Battlefield")
+    st.caption("Visualize 1-Year trends, multiple EMAs, ATR Volatility, and Keltner Channels.")
+    
+    chart_col1, chart_col2 = st.columns([1, 4])
+    
+    with chart_col1:
+        chart_tk = st.text_input("Ticker to Chart", value="SPY", key="chart_tk2").upper()
+        
+        st.write("**Indicator Toggles**")
+        show_ema_fast = st.checkbox("Show 20 & 50 EMA", value=True)
+        show_ema_slow = st.checkbox("Show 100 & 200 EMA", value=False)
+        show_kc = st.checkbox("Show Keltner Channels (KC)", value=True)
+        show_sr = st.checkbox("Show Support/Resistance", value=True)
+        
+        draw_btn = st.button("📊 Draw Chart", use_container_width=True, type="primary")
+        
+        st.write("---")
+        # Placeholder for dynamic ATR reading
+        atr_placeholder = st.empty()
+        
+    with chart_col2:
+        if draw_btn:
+            with st.spinner(f"Crunching technicals and generating chart for {chart_tk}..."):
+                try:
+                    # Bumped up to 1 year of data so the 200 EMA can calculate accurately!
+                    ticker_data = yf.Ticker(chart_tk)
+                    df_chart = ticker_data.history(period="1y")
+                    
+                    if df_chart.empty:
+                        st.error(f"Could not pull chart data for {chart_tk}.")
+                    else:
+                        # 1. EMAs
+                        df_chart['EMA_20'] = df_chart['Close'].ewm(span=20, adjust=False).mean()
+                        df_chart['EMA_50'] = df_chart['Close'].ewm(span=50, adjust=False).mean()
+                        df_chart['EMA_100'] = df_chart['Close'].ewm(span=100, adjust=False).mean()
+                        df_chart['EMA_200'] = df_chart['Close'].ewm(span=200, adjust=False).mean()
+                        
+                        # 2. Average True Range (ATR - 14 Day)
+                        high_low = df_chart['High'] - df_chart['Low']
+                        high_close = np.abs(df_chart['High'] - df_chart['Close'].shift())
+                        low_close = np.abs(df_chart['Low'] - df_chart['Close'].shift())
+                        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+                        true_range = np.max(ranges, axis=1)
+                        df_chart['ATR_14'] = true_range.rolling(14).mean()
+                        
+                        current_atr = df_chart['ATR_14'].iloc[-1]
+                        atr_placeholder.metric("14-Day ATR", f"${current_atr:.2f}", help="The average dollar amount this stock moves per day.")
+                        
+                        # 3. Keltner Channels (20 EMA +/- 2*ATR)
+                        df_chart['KC_Upper'] = df_chart['EMA_20'] + (2 * df_chart['ATR_14'])
+                        df_chart['KC_Lower'] = df_chart['EMA_20'] - (2 * df_chart['ATR_14'])
+                        
+                        # 4. Support / Resistance (using the whole 1y period for major levels)
+                        resistance = df_chart['High'].max()
+                        support = df_chart['Low'].min()
+                        current_close = df_chart['Close'].iloc[-1]
+                        
+                        # Determine Volume Colors
+                        vol_colors = ['rgba(39, 174, 96, 0.7)' if row['Close'] >= row['Open'] else 'rgba(231, 76, 60, 0.7)' for index, row in df_chart.iterrows()]
+                        
+                        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                                            vertical_spacing=0.03, subplot_titles=(f'{chart_tk} 1-Year Price Action', 'Volume'),
+                                            row_width=[0.2, 0.7]) 
+
+                        # Candlesticks
+                        fig.add_trace(go.Candlestick(
+                            x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
+                            low=df_chart['Low'], close=df_chart['Close'], name='Price'
+                        ), row=1, col=1)
+
+                        # Toggled Fast EMAs
+                        if show_ema_fast:
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_20'], mode='lines', name='20 EMA', line=dict(color='blue', width=1.5)), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_50'], mode='lines', name='50 EMA', line=dict(color='orange', width=1.5)), row=1, col=1)
+
+                        # Toggled Slow EMAs
+                        if show_ema_slow:
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_100'], mode='lines', name='100 EMA', line=dict(color='purple', width=1.5)), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA_200'], mode='lines', name='200 EMA', line=dict(color='black', width=2)), row=1, col=1)
+
+                        # Toggled Keltner Channels
+                        if show_kc:
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['KC_Upper'], mode='lines', name='KC Upper', line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dot')), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['KC_Lower'], mode='lines', name='KC Lower', line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dot'), fill='tonexty', fillcolor='rgba(128, 128, 128, 0.05)'), row=1, col=1)
+
+                        # Toggled Support/Resistance
+                        if show_sr:
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=[resistance] * len(df_chart), mode='lines', name='Resistance', line=dict(color='red', width=2, dash='dash')), row=1, col=1)
+                            fig.add_trace(go.Scatter(x=df_chart.index, y=[support] * len(df_chart), mode='lines', name='Support', line=dict(color='green', width=2, dash='dash')), row=1, col=1)
+
+                        # Volume
+                        fig.add_trace(go.Bar(
+                            x=df_chart.index, y=df_chart['Volume'], name='Volume', marker_color=vol_colors
+                        ), row=2, col=1)
+
+                        fig.update_layout(
+                            title=f"{chart_tk} Technical Analysis | Current Price: ${current_close:.2f}",
+                            template="plotly_white",
+                            height=750,
+                            margin=dict(l=0, r=0, t=60, b=0),
+                            showlegend=True, 
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                            xaxis_rangeslider_visible=False 
+                        )
+                        
+                        fig.update_xaxes(rangeslider_visible=False)
+                        st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error generating chart: {e}")
+        else:
+            st.info("👈 Use the toggles to clean up the chart, then click 'Draw Chart'.")
 
 # --- LEDGER (100% UNTOUCHED) ---
 with tab2:
@@ -388,7 +501,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v27",
+        key="ledger_editor_v30",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
