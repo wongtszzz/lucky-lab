@@ -110,11 +110,12 @@ if 'journal' not in st.session_state or set(st.session_state.journal.columns) !=
     st.session_state.journal = load_journal()
     st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+# Global variables
+current_vix = 20.0
+market_daily_expected_pct = 0.0
+
 # --- 3. UI TABS ---
 tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
-
-# Global variable to pass the market's expected move from left column to right column
-market_daily_expected_pct = 0.0
 
 # --- OPTIMIZER (50/50 Market & Strategy Split) ---
 with tab1:
@@ -143,15 +144,14 @@ with tab1:
             
             if spy_px == 0.0 or vix_px == 0.0:
                 raise ValueError("Yahoo Timeout")
-            
-            # THE MATH: Rule of 16 (VIX / sqrt(252))
-            market_daily_expected_pct = vix_px / np.sqrt(252)
+                
+            current_vix = vix_px
+            market_daily_expected_pct = current_vix / np.sqrt(252)
             daily_expected_dollar = spy_px * (market_daily_expected_pct / 100)
             
             exp_high = spy_px + daily_expected_dollar
             exp_low = spy_px - daily_expected_dollar
             
-            # Displaying the Oracle Data cleanly
             m1, m2 = st.columns(2)
             m1.metric("SPY Current Price", f"${spy_px:,.2f}")
             m2.metric("Tomorrow's Move", f"± {market_daily_expected_pct:.2f}%", f"± ${daily_expected_dollar:.2f}", delta_color="off")
@@ -163,7 +163,6 @@ with tab1:
             st.info(f"💡 **SPY Baseline:** The broader market is pricing in a **{market_daily_expected_pct:.2f}%** move for tomorrow.")
 
         except Exception as e:
-            # Fallback using Alpaca
             st.caption("*(Yahoo Timeout - Auto-switched to Alpaca ETF Feed)*")
             try:
                 req = StockLatestQuoteRequest(symbol_or_symbols=["SPY", "VIXY"], feed=DataFeed.IEX)
@@ -172,9 +171,8 @@ with tab1:
                 spy_px = quotes["SPY"].ask_price if quotes["SPY"].ask_price > 0 else 0.0
                 vixy_px = quotes["VIXY"].ask_price if quotes["VIXY"].ask_price > 0 else 0.0
                 
-                # We use VIXY as a proxy here if Yahoo fails
-                proxy_vix = vixy_px * 1.5 
-                market_daily_expected_pct = proxy_vix / np.sqrt(252)
+                current_vix = vixy_px * 1.5 
+                market_daily_expected_pct = current_vix / np.sqrt(252)
                 daily_expected_dollar = spy_px * (market_daily_expected_pct / 100)
                 
                 exp_high = spy_px + daily_expected_dollar
@@ -193,46 +191,42 @@ with tab1:
 
     # --- RIGHT SIDE: OPTIONS CHAIN SCANNER ---
     with col_opt:
-        st.markdown("#### 🎯 Options Chain Scanner")
-        st.caption("Find the best premiums within ±10% of the current price.")
+        st.markdown("#### 🎯 Smart Targeting Engine")
+        st.caption("Calculates the exact Safe Zone for your specific Expiry Date.")
         
         c1, c2, c3 = st.columns(3)
         tk = c1.text_input("Ticker", value="TSM").upper()
         target_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=30))
         opt_filter = c3.selectbox("Show", ["Puts Only", "Calls Only", "Both"])
         
-        if st.button("🔬 Scan Chain", type="primary", use_container_width=True):
-            with st.spinner(f"Scanning {tk} live chain and analyzing Beta..."):
+        if st.button("🔬 Analyze & Scan", type="primary", use_container_width=True):
+            with st.spinner(f"Running Smart Target Math for {tk}..."):
                 try:
-                    # Fetch Latest Price
                     px_req = StockLatestQuoteRequest(symbol_or_symbols=tk, feed=DataFeed.IEX)
                     px = stock_client.get_stock_latest_quote(px_req)[tk].ask_price
                     
-                    # PRO FIX: Fetch Beta using Yahoo Finance!
                     try:
                         beta = yf.Ticker(tk).info.get('beta', 1.0)
                         if beta is None: beta = 1.0
                     except:
                         beta = 1.0
                     
-                    # Calculate Individual Stock Expected Move (Market Move * Beta)
-                    stock_expected_pct = market_daily_expected_pct * beta
-                    stock_expected_dollar = px * (stock_expected_pct / 100)
+                    days_to_exp = (target_ex - datetime.now().date()).days
+                    if days_to_exp <= 0: days_to_exp = 1 
                     
-                    # Calculate 30-Day Historical Volatility (HV)
-                    end_dt = datetime.now()
-                    start_dt = end_dt - timedelta(days=45) 
-                    hv = 0.0
-                    try:
-                        bar_req = StockBarsRequest(symbol_or_symbols=tk, timeframe=TimeFrame.Day, start=start_dt, end=end_dt, feed=DataFeed.IEX)
-                        bars = stock_client.get_stock_bars(bar_req)
-                        if tk in bars.df.index.levels[0]:
-                            closes = bars.df.loc[tk]['close']
-                            daily_returns = closes.pct_change().dropna()
-                            hv = daily_returns.std() * np.sqrt(252) * 100 
-                    except: pass 
+                    stock_iv_proxy = current_vix * beta
+                    exp_move_pct = (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
+                    exp_move_dollar = px * exp_move_pct
                     
-                    # Fetch Option Chain
+                    safe_put_floor = px - exp_move_dollar
+                    safe_call_ceiling = px + exp_move_dollar
+                    
+                    st.success(f"**{tk} Current Price:** ${px:.2f} | **{days_to_exp} Days to Expiry**")
+                    
+                    t1, t2 = st.columns(2)
+                    t1.info(f"🛡️ **Safe Put Zone:** Below **${safe_put_floor:.2f}**")
+                    t2.error(f"🛡️ **Safe Call Zone:** Above **${safe_call_ceiling:.2f}**")
+                    
                     chain_req = OptionChainRequest(underlying_symbol=tk, expiration_date=target_ex, feed=OptionsFeed.INDICATIVE)
                     chain = opt_client.get_option_chain(chain_req)
                     
@@ -244,7 +238,7 @@ with tab1:
                         if opt_filter == "Puts Only" and opt_type == "Call": continue
                         if opt_filter == "Calls Only" and opt_type == "Put": continue
                         
-                        if px * 0.90 <= stk_val <= px * 1.10:
+                        if px * 0.80 <= stk_val <= px * 1.20:
                             
                             bid = d.latest_quote.bid_price if d.latest_quote else 0.0
                             ask = d.latest_quote.ask_price if d.latest_quote else 0.0
@@ -254,32 +248,36 @@ with tab1:
                             iv = d.implied_volatility if d.implied_volatility is not None else 0.0
                             roc = (mid / stk_val) * 100 if stk_val > 0 else 0.0
                             
+                            # PRO FEATURE: Calculate distance % from current price
+                            dist_pct = ((stk_val - px) / px) * 100
+                            
                             res.append({
                                 "Type": opt_type,
                                 "Strike": stk_val,
+                                "Dist %": round(dist_pct, 1),
                                 "Delta": round(delta, 3),
                                 "Mid Price": round(mid, 2),
                                 "ROC %": round(roc, 2),
                                 "IV %": round(iv * 100, 1)
                             })
                             
-                    # Display the new individual stock forecasting metrics!
-                    st.success(f"**{tk} Price:** ${px:.2f} | **Beta:** {beta:.2f} | **Tomorrow's Est. Move:** ±{stock_expected_pct:.2f}% (±${stock_expected_dollar:.2f})")
-                    st.caption("🟢 **Highlighted Rows:** Delta < 15% AND Implied Volatility (IV) > 50%")
+                    st.caption("🟢 **Highlighted Rows:** Delta < ±0.15 AND Implied Volatility (IV) > 70%")
                     
                     if res:
                         df_res = pd.DataFrame(res).sort_values(by=["Type", "Strike"], ascending=[False, False])
                         
                         def highlight_golden_trades(row):
                             try:
-                                is_golden = (0.0 < abs(float(row['Delta'])) < 0.15) and (float(row['IV %']) > 50.0)
+                                # Updated highlight logic: Abs(Delta) < 0.15 and IV > 70%
+                                is_golden = (0.0 < abs(float(row['Delta'])) < 0.15) and (float(row['IV %']) > 70.0)
                                 if is_golden:
                                     return ['background-color: rgba(39, 174, 96, 0.4); font-weight: bold;'] * len(row)
                             except: pass
                             return [''] * len(row)
                             
                         styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
-                            "Mid Price": "${:.2f}"
+                            "Mid Price": "${:.2f}",
+                            "Dist %": "{:+.1f}%" # Adds a clean + or - sign to the distance
                         })
                         
                         st.dataframe(styled_df, use_container_width=True, hide_index=True)
@@ -383,7 +381,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v22",
+        key="ledger_editor_v24",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
