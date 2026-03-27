@@ -196,7 +196,7 @@ with tab1:
         
         c1, c2, c3 = st.columns(3)
         tk = c1.text_input("Ticker", value="TSM").upper()
-        target_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=30))
+        target_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
         opt_filter = c3.selectbox("Show", ["Puts Only", "Calls Only", "Both"])
         
         if st.button("🔬 Analyze & Scan", type="primary", use_container_width=True):
@@ -247,8 +247,6 @@ with tab1:
                             delta = d.greeks.delta if d.greeks and d.greeks.delta is not None else 0.0
                             iv = d.implied_volatility if d.implied_volatility is not None else 0.0
                             roc = (mid / stk_val) * 100 if stk_val > 0 else 0.0
-                            
-                            # PRO FEATURE: Calculate distance % from current price
                             dist_pct = ((stk_val - px) / px) * 100
                             
                             res.append({
@@ -261,23 +259,30 @@ with tab1:
                                 "IV %": round(iv * 100, 1)
                             })
                             
-                    st.caption("🟢 **Highlighted Rows:** Delta < ±0.15 AND Implied Volatility (IV) > 70%")
+                    st.caption("🟢 **Golden Weekly Setup:** Outside Safe Zone + Delta (0.05-0.25)")
                     
                     if res:
-                        df_res = pd.DataFrame(res).sort_values(by=["Type", "Strike"], ascending=[False, False])
+                        df_res = pd.DataFrame(res).sort_values(by=["Type", "ROC %"], ascending=[False, False])
                         
                         def highlight_golden_trades(row):
                             try:
-                                # Updated highlight logic: Abs(Delta) < 0.15 and IV > 70%
-                                is_golden = (0.0 < abs(float(row['Delta'])) < 0.15) and (float(row['IV %']) > 70.0)
-                                if is_golden:
+                                # 1. Outside the Oracle's Expected Move limit
+                                is_safe_put = (row['Type'] == 'Put') and (float(row['Strike']) <= safe_put_floor)
+                                is_safe_call = (row['Type'] == 'Call') and (float(row['Strike']) >= safe_call_ceiling)
+                                is_safe_zone = is_safe_put or is_safe_call
+                                
+                                # 2. Delta between 0.05 and 0.25
+                                is_good_delta = 0.05 <= abs(float(row['Delta'])) <= 0.25
+                                
+                                # Anti-Penny rule removed! Let's see those pennies fly.
+                                if is_safe_zone and is_good_delta:
                                     return ['background-color: rgba(39, 174, 96, 0.4); font-weight: bold;'] * len(row)
                             except: pass
                             return [''] * len(row)
                             
                         styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
                             "Mid Price": "${:.2f}",
-                            "Dist %": "{:+.1f}%" # Adds a clean + or - sign to the distance
+                            "Dist %": "{:+.1f}%" 
                         })
                         
                         st.dataframe(styled_df, use_container_width=True, hide_index=True)
@@ -381,7 +386,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v24",
+        key="ledger_editor_v26",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
