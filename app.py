@@ -252,11 +252,11 @@ with tab1:
                             res.append({
                                 "Type": opt_type,
                                 "Strike": stk_val,
-                                "Dist %": round(dist_pct, 1),
-                                "Delta": round(delta, 3),
-                                "Mid Price": round(mid, 2),
-                                "ROC %": round(roc, 2),
-                                "IV %": round(iv * 100, 1)
+                                "Dist %": dist_pct,
+                                "Delta": delta,
+                                "Mid Price": mid,
+                                "ROC %": roc,
+                                "IV %": iv * 100
                             })
                             
                     st.caption("🟢 **Golden Weekly Setup:** Outside Safe Zone + Delta (0.05-0.25)")
@@ -266,22 +266,24 @@ with tab1:
                         
                         def highlight_golden_trades(row):
                             try:
-                                # 1. Outside the Oracle's Expected Move limit
                                 is_safe_put = (row['Type'] == 'Put') and (float(row['Strike']) <= safe_put_floor)
                                 is_safe_call = (row['Type'] == 'Call') and (float(row['Strike']) >= safe_call_ceiling)
                                 is_safe_zone = is_safe_put or is_safe_call
                                 
-                                # 2. Delta between 0.05 and 0.25
                                 is_good_delta = 0.05 <= abs(float(row['Delta'])) <= 0.25
                                 
-                                # Anti-Penny rule removed! Let's see those pennies fly.
                                 if is_safe_zone and is_good_delta:
                                     return ['background-color: rgba(39, 174, 96, 0.4); font-weight: bold;'] * len(row)
                             except: pass
                             return [''] * len(row)
                             
+                        # PRO FIX: Strictly enforce decimal formatting to strip all messy trailing zeros!
                         styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
+                            "Strike": "{:.2f}",
+                            "Delta": "{:.3f}",
                             "Mid Price": "${:.2f}",
+                            "ROC %": "{:.2f}%",
+                            "IV %": "{:.1f}%",
                             "Dist %": "{:+.1f}%" 
                         })
                         
@@ -386,10 +388,10 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v26",
+        key="ledger_editor_v27",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
-            "Strike": st.column_config.NumberColumn(format="%.1f"),
+            "Strike": st.column_config.NumberColumn(format="%.2f"),
             "Open Price": st.column_config.NumberColumn(format="%.2f"),
             "Close Price": st.column_config.NumberColumn(format="%.2f"),
             "Commission": st.column_config.NumberColumn(format="$%.2f"),
