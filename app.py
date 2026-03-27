@@ -113,80 +113,81 @@ if 'journal' not in st.session_state or set(st.session_state.journal.columns) !=
 # --- 3. UI TABS ---
 tab1, tab2 = st.tabs(["🔍 Strategy Optimizer", "📓 Lucky Ledger"])
 
+# Global variable to pass the market's expected move from left column to right column
+market_daily_expected_pct = 0.0
+
 # --- OPTIMIZER (50/50 Market & Strategy Split) ---
 with tab1:
     col_market, col_opt = st.columns(2, gap="large")
     
-    # --- LEFT SIDE: MARKET PULSE (Dual-Engine Fallback) ---
+    # --- LEFT SIDE: THE MARKET ORACLE (Expected Move) ---
     with col_market:
-        # PRO HACK: We put the header and the refresh button on the same line using columns
         head_col, btn_col = st.columns([3, 1])
         with head_col:
-            st.markdown("#### 📊 Market Pulse")
+            st.markdown("#### 🔮 Market Oracle")
         with btn_col:
-            # Clicking this forces Streamlit to re-run the script and fetch fresh data
             st.button("🔄 Refresh", use_container_width=True)
             
-        st.caption("Live snapshot of broader market trends and true index volatility.")
+        st.caption("Calculates tomorrow's expected ± % move based on real-time VIX.")
         
         try:
-            # ENGINE 1: Try Yahoo Finance for the True Indices first
-            def get_yf_metrics(symbol):
+            def get_yf_close(symbol):
                 t = yf.Ticker(symbol)
                 df = t.history(period='5d')
-                if len(df) >= 2:
-                    prev = float(df['Close'].iloc[-2])
-                    curr = float(df['Close'].iloc[-1])
-                    pct = ((curr - prev) / prev) * 100
-                    return curr, pct
-                return 0.0, 0.0
+                if not df.empty:
+                    return float(df['Close'].iloc[-1])
+                return 0.0
             
-            spy_p, spy_pct = get_yf_metrics("^GSPC")
+            spy_px = get_yf_close("SPY")
+            vix_px = get_yf_close("^VIX")
             
-            if spy_p == 0.0:
-                raise ValueError("Yahoo Finance returned empty data (IP timeout).")
-                
-            qqq_p, qqq_pct = get_yf_metrics("^IXIC")
-            iwm_p, iwm_pct = get_yf_metrics("^RUT")
-            vix_p, vix_pct = get_yf_metrics("^VIX")
+            if spy_px == 0.0 or vix_px == 0.0:
+                raise ValueError("Yahoo Timeout")
             
+            # THE MATH: Rule of 16 (VIX / sqrt(252))
+            market_daily_expected_pct = vix_px / np.sqrt(252)
+            daily_expected_dollar = spy_px * (market_daily_expected_pct / 100)
+            
+            exp_high = spy_px + daily_expected_dollar
+            exp_low = spy_px - daily_expected_dollar
+            
+            # Displaying the Oracle Data cleanly
             m1, m2 = st.columns(2)
-            m1.metric("S&P 500", f"{spy_p:,.2f}", f"{spy_pct:+.2f}%")
-            m2.metric("Nasdaq", f"{qqq_p:,.2f}", f"{qqq_pct:+.2f}%")
+            m1.metric("SPY Current Price", f"${spy_px:,.2f}")
+            m2.metric("Tomorrow's Move", f"± {market_daily_expected_pct:.2f}%", f"± ${daily_expected_dollar:.2f}", delta_color="off")
             
             m3, m4 = st.columns(2)
-            m3.metric("Russell 2000", f"{iwm_p:,.2f}", f"{iwm_pct:+.2f}%")
-            m4.metric("Volatility (VIX)", f"{vix_p:,.2f}", f"{vix_pct:+.2f}%", delta_color="inverse")
-            st.info("💡 **Pro Tip:** When the real VIX spikes green (above 20), option premiums become rich.")
+            m3.metric("Expected High (Ceiling)", f"${exp_high:,.2f}", "Resistance", delta_color="normal")
+            m4.metric("Expected Low (Floor)", f"${exp_low:,.2f}", "Support", delta_color="inverse")
+            
+            st.info(f"💡 **SPY Baseline:** The broader market is pricing in a **{market_daily_expected_pct:.2f}%** move for tomorrow.")
 
         except Exception as e:
-            # ENGINE 2: The Fallback to Alpaca ETFs
+            # Fallback using Alpaca
             st.caption("*(Yahoo Timeout - Auto-switched to Alpaca ETF Feed)*")
             try:
-                req = StockSnapshotRequest(symbol_or_symbols=["SPY", "QQQ", "IWM", "VIXY"], feed=DataFeed.IEX)
-                snaps = stock_client.get_stock_snapshot(req)
+                req = StockLatestQuoteRequest(symbol_or_symbols=["SPY", "VIXY"], feed=DataFeed.IEX)
+                quotes = stock_client.get_stock_latest_quote(req)
                 
-                def get_alpaca_metrics(tk):
-                    if tk in snaps and snaps[tk].previous_daily_bar:
-                        curr = snaps[tk].latest_trade.price if snaps[tk].latest_trade and snaps[tk].latest_trade.price > 0 else snaps[tk].latest_quote.ask_price
-                        prev = snaps[tk].previous_daily_bar.close
-                        pct = ((curr - prev) / prev) * 100
-                        return curr, pct
-                    return 0.0, 0.0
+                spy_px = quotes["SPY"].ask_price if quotes["SPY"].ask_price > 0 else 0.0
+                vixy_px = quotes["VIXY"].ask_price if quotes["VIXY"].ask_price > 0 else 0.0
                 
-                spy_p, spy_pct = get_alpaca_metrics("SPY")
-                qqq_p, qqq_pct = get_alpaca_metrics("QQQ")
-                iwm_p, iwm_pct = get_alpaca_metrics("IWM")
-                vixy_p, vixy_pct = get_alpaca_metrics("VIXY")
+                # We use VIXY as a proxy here if Yahoo fails
+                proxy_vix = vixy_px * 1.5 
+                market_daily_expected_pct = proxy_vix / np.sqrt(252)
+                daily_expected_dollar = spy_px * (market_daily_expected_pct / 100)
+                
+                exp_high = spy_px + daily_expected_dollar
+                exp_low = spy_px - daily_expected_dollar
                 
                 m1, m2 = st.columns(2)
-                m1.metric("S&P 500 (SPY)", f"${spy_p:.2f}", f"{spy_pct:+.2f}%")
-                m2.metric("Nasdaq (QQQ)", f"${qqq_p:.2f}", f"{qqq_pct:+.2f}%")
+                m1.metric("SPY Current Price", f"${spy_px:,.2f}")
+                m2.metric("Tomorrow's Move (Est.)", f"± {market_daily_expected_pct:.2f}%", f"± ${daily_expected_dollar:.2f}", delta_color="off")
                 
                 m3, m4 = st.columns(2)
-                m3.metric("Russell 2000 (IWM)", f"${iwm_p:.2f}", f"{iwm_pct:+.2f}%")
-                m4.metric("Volatility (VIXY)", f"${vixy_p:.2f}", f"{vixy_pct:+.2f}%", delta_color="inverse")
-                st.info("💡 **Pro Tip:** When Volatility (VIXY) is deeply green, option premiums are richer.")
+                m3.metric("Expected High", f"${exp_high:,.2f}", "Resistance")
+                m4.metric("Expected Low", f"${exp_low:,.2f}", "Support", delta_color="inverse")
+                
             except:
                 st.warning("All market data feeds are currently down.")
 
@@ -201,11 +202,24 @@ with tab1:
         opt_filter = c3.selectbox("Show", ["Puts Only", "Calls Only", "Both"])
         
         if st.button("🔬 Scan Chain", type="primary", use_container_width=True):
-            with st.spinner(f"Scanning {tk} live chain and calculating Volatility..."):
+            with st.spinner(f"Scanning {tk} live chain and analyzing Beta..."):
                 try:
+                    # Fetch Latest Price
                     px_req = StockLatestQuoteRequest(symbol_or_symbols=tk, feed=DataFeed.IEX)
                     px = stock_client.get_stock_latest_quote(px_req)[tk].ask_price
                     
+                    # PRO FIX: Fetch Beta using Yahoo Finance!
+                    try:
+                        beta = yf.Ticker(tk).info.get('beta', 1.0)
+                        if beta is None: beta = 1.0
+                    except:
+                        beta = 1.0
+                    
+                    # Calculate Individual Stock Expected Move (Market Move * Beta)
+                    stock_expected_pct = market_daily_expected_pct * beta
+                    stock_expected_dollar = px * (stock_expected_pct / 100)
+                    
+                    # Calculate 30-Day Historical Volatility (HV)
                     end_dt = datetime.now()
                     start_dt = end_dt - timedelta(days=45) 
                     hv = 0.0
@@ -218,6 +232,7 @@ with tab1:
                             hv = daily_returns.std() * np.sqrt(252) * 100 
                     except: pass 
                     
+                    # Fetch Option Chain
                     chain_req = OptionChainRequest(underlying_symbol=tk, expiration_date=target_ex, feed=OptionsFeed.INDICATIVE)
                     chain = opt_client.get_option_chain(chain_req)
                     
@@ -248,7 +263,8 @@ with tab1:
                                 "IV %": round(iv * 100, 1)
                             })
                             
-                    st.success(f"**{tk} Current Price:** ${px:.2f} | **30-Day HV:** {hv:.1f}%")
+                    # Display the new individual stock forecasting metrics!
+                    st.success(f"**{tk} Price:** ${px:.2f} | **Beta:** {beta:.2f} | **Tomorrow's Est. Move:** ±{stock_expected_pct:.2f}% (±${stock_expected_dollar:.2f})")
                     st.caption("🟢 **Highlighted Rows:** Delta < 15% AND Implied Volatility (IV) > 50%")
                     
                     if res:
@@ -367,7 +383,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v20",
+        key="ledger_editor_v22",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.1f"),
