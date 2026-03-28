@@ -131,7 +131,7 @@ if 'current_vix' not in st.session_state:
 
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
-# --- 3. UI TABS (NOW 4 DEDICATED TABS) ---
+# --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🛡️ Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
 # --- TAB 1: MACRO PLAYBOOK ---
@@ -162,7 +162,6 @@ with tab_macro:
         
         st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
         
-        # Determine Statuses for Display
         oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 90 else "🔴 Spiking")
         dxy_status = "🟢 Weak (Dovish)" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 106 else "🔴 Strong (Hawkish)")
         vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
@@ -195,6 +194,64 @@ with tab_macro:
         )
 
         st.write("---")
+        
+        # --- DUAL AUTOMATED MARKET BREADTH ---
+        st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
+        st.caption("Auto-calculates the percentage of proxy stocks/sectors trading above their 20-Day moving average.")
+        
+        sp500_sectors = ["XLK", "XLV", "XLF", "XLY", "XLC", "XLI", "XLP", "XLE", "XLU", "XLRE", "XLB"]
+        nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX", "AMD", "PEP", "CSCO", "TMUS", "ADBE"]
+        
+        @st.cache_data(ttl=900)
+        def get_automated_breadth(ticker_list):
+            try:
+                df = yf.download(ticker_list, period="1mo", progress=False)
+                close_df = df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
+                above_20ma = 0
+                valid_count = 0
+                for s in ticker_list:
+                    if s in close_df.columns:
+                        prices = close_df[s].dropna()
+                        if len(prices) >= 20:
+                            valid_count += 1
+                            sma20 = prices.tail(20).mean()
+                            if prices.iloc[-1] > sma20:
+                                above_20ma += 1
+                if valid_count == 0: return 50.0, 0, len(ticker_list)
+                return (above_20ma / valid_count) * 100, above_20ma, valid_count
+            except:
+                return 50.0, 0, len(ticker_list)
+                
+        # Calculate Both Breadth Indices
+        s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
+        nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
+        
+        # Display the metrics side-by-side
+        b1, b2 = st.columns(2)
+        b1.metric(
+            label="S&P 500 Breadth (S5TW Proxy)", 
+            value=f"{s5tw_pct:.0f}%", 
+            delta=f"{s5tw_up}/{s5tw_total} Sectors Trending Up", 
+            delta_color="normal" if s5tw_pct >= 50 else "inverse"
+        )
+        b2.metric(
+            label="Nasdaq Breadth (NCTW Proxy)", 
+            value=f"{nctw_pct:.0f}%", 
+            delta=f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", 
+            delta_color="normal" if nctw_pct >= 50 else "inverse"
+        )
+        
+        # Average the two for a comprehensive market health score
+        breadth_avg = (s5tw_pct + nctw_pct) / 2
+        
+        if breadth_avg >= 80:
+            st.error(f"🔥 OVERBOUGHT: The rally is exhausted across both indices. Selling calls is mathematically safer here.")
+        elif breadth_avg <= 20:
+            st.success(f"🧊 OVERSOLD: The market is completely washed out. Blood is in the streets. This is the optimal time to sell Puts on high-quality tech.")
+        else:
+            st.info(f"⚖️ NEUTRAL: The market has healthy, mixed participation. Proceed with standard macro strategies.")
+
+        st.write("---")
         st.markdown("#### 📖 Daily Strategy Playbook")
         
         # --- THE MACRO REGIME ENGINE ---
@@ -223,7 +280,7 @@ with tab_macro:
             <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
                 <h3 style="color: white; margin-top: 0;">🚀 EXTREME BULLISH / RISK-ON</h3>
                 <p style="font-size: 1.1em; margin-bottom: 0;">
-                <b>Strategy:</b> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist (NVDA, TSLA, etc.). Ride the liquidity wave, but be mindful of sudden pullbacks.
+                <b>Strategy:</b> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist (NVDA, TSLA, etc.). Ride the liquidity wave, but watch the Breadth dials for exhaustion.
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -253,7 +310,6 @@ with tab_safezone:
     with c2:
         calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
     with c3:
-        # Pushing the button down to align with inputs
         st.write("")
         st.write("")
         run_calc = st.button("🧮 Calculate Safe Zones", type="primary", use_container_width=True)
@@ -311,18 +367,14 @@ with tab_screener:
                     
                     current_price = df['Close'].iloc[-1]
                     
-                    # Reality Check (Historical Volatility)
                     daily_returns = df['Close'].pct_change().dropna()
                     realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
                     
-                    # Market Fear (Implied Volatility Proxy)
                     beta = t_data.info.get('beta', 1.0) or 1.0
                     implied_vol = st.session_state.current_vix * beta
                     
-                    # VRP Edge
                     vrp_edge = implied_vol - realized_vol
                     
-                    # RSI
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -346,7 +398,6 @@ with tab_screener:
                 filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge (Your Profit)"] >= min_edge)]
                 filtered_df = filtered_df.sort_values(by="VRP Edge (Your Profit)", ascending=False) 
                 st.success(f"Found {len(filtered_df)} beaten-down candidates where fear is massively overpricing the puts.")
-                
             else:
                 filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge (Your Profit)"] >= min_edge)]
                 filtered_df = filtered_df.sort_values(by="VRP Edge (Your Profit)", ascending=False) 
@@ -442,7 +493,7 @@ with tab_ledger:
 
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
-        num_rows="dynamic", use_container_width=True, key="ledger_editor_final6",
+        num_rows="dynamic", use_container_width=True, key="ledger_editor_final9",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
