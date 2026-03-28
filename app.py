@@ -16,6 +16,7 @@ from github import Github
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Quants Lab", page_icon="🧪", layout="wide")
 
+# PRO HACK: Added custom CSS for the Creed Box to make it look like a sleek terminal!
 st.markdown("""
 <style>
     [data-testid="metric-container"] {
@@ -35,6 +36,26 @@ st.markdown("""
     [data-testid="stMetricDelta"] { font-size: 1rem !important; color: #888888 !important; justify-content: center !important; }
     [data-testid="stMetricDelta"] > svg { display: none; }
     .footer-right { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.8em; z-index: 1000; }
+    
+    .creed-box {
+        background-color: rgba(128, 128, 128, 0.05); 
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        border-left: 5px solid #2962FF; 
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin-bottom: 25px;
+    }
+    .creed-title {
+        font-weight: 800;
+        font-size: 1.1em;
+        margin-bottom: 10px;
+        color: #2962FF;
+        letter-spacing: 0.5px;
+    }
+    .creed-text {
+        font-size: 0.95em;
+        line-height: 1.6;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -424,16 +445,19 @@ with tab_chart:
         else:
             st.info("👈 Use the toggles to clean up the chart, then click 'Draw Chart'.")
 
-# --- LEDGER (UPDATED WITH CREED) ---
+# --- LEDGER (UPDATED WITH SLEEK HTML BOX) ---
 with tab2:
     
-    # --- NEW TRADER REMINDERS ---
-    st.warning("""
-    🧠 **The Quants Creed:**
-    1. **Hope is not a strategy.** Cut your losses mechanically.
-    2. **Watch the clock.** Beware of Market-on-Close (MOC) volatility and the notorious Friday Flush.
-    """)
-    st.write("---")
+    # --- PRO HACK: Custom sleek HTML replacing the default yellow warning box ---
+    st.markdown("""
+    <div class="creed-box">
+        <div class="creed-title">🧠 The Quants Creed</div>
+        <div class="creed-text">
+            <b>1. Hope is not a strategy.</b> Cut your losses mechanically.<br>
+            <b>2. Watch the clock.</b> Beware of Market-on-Close (MOC) volatility and the notorious Friday Flush.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     df_j = st.session_state.journal
     
@@ -528,7 +552,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v35",
+        key="ledger_editor_v36",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
