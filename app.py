@@ -200,19 +200,20 @@ with tab1:
                 except Exception as e:
                     st.error(f"Calculation Error: {e}")
 
-# --- TAB 2: THE OPPORTUNITY SCREENER ---
+# --- TAB 2: THE OPPORTUNITY SCREENER (UPGRADED WITH VRP) ---
 with tab_screener:
-    st.markdown("#### 🔎 Live Opportunity Screener")
-    st.caption(f"Scanning the {len(WATCHLIST)} most liquid options tickers for mechanical setups.")
+    st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
+    st.caption(f"Scanning the {len(WATCHLIST)} most liquid tickers for over-priced option premiums.")
     
     col_filt1, col_filt2 = st.columns(2)
     with col_filt1:
         strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
     with col_filt2:
-        min_vol = st.slider("Minimum Volatility (HV %)", min_value=10, max_value=100, value=35, step=5, help="Higher Volatility = Higher Option Premiums.")
+        # Replaced Min Volatility with Minimum VRP Edge
+        min_edge = st.slider("Minimum VRP Edge (+%)", min_value=0, max_value=25, value=5, step=1, help="The difference between the market's fear (Implied Volatility) and actual reality (Historical Volatility). Higher edge = Overpriced Options!")
         
-    if st.button("🚀 Run Scan", use_container_width=True, type="primary"):
-        with st.spinner("Analyzing price action, RSI, and Volatility..."):
+    if st.button("🚀 Run Edge Scan", use_container_width=True, type="primary"):
+        with st.spinner("Calculating Implied vs Historical Volatility Edges..."):
             screener_results = []
             
             for ticker in WATCHLIST:
@@ -223,23 +224,31 @@ with tab_screener:
                     
                     current_price = df['Close'].iloc[-1]
                     
+                    # 1. Reality Check (Historical Volatility - HV_30)
                     daily_returns = df['Close'].pct_change().dropna()
-                    hv_30 = daily_returns.tail(30).std() * np.sqrt(252) * 100
+                    realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
                     
+                    # 2. Market Fear (Implied Volatility Proxy)
+                    beta = t_data.info.get('beta', 1.0) or 1.0
+                    implied_vol = st.session_state.current_vix * beta
+                    
+                    # 3. The Holy Grail Metric (Volatility Risk Premium)
+                    vrp_edge = implied_vol - realized_vol
+                    
+                    # RSI for exhaustion direction
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                     rs = gain / loss
                     rsi_14 = 100 - (100 / (1 + rs.iloc[-1]))
                     
-                    sma_20 = df['Close'].rolling(window=20).mean().iloc[-1]
-                    
                     screener_results.append({
                         "Ticker": ticker,
                         "Price": round(current_price, 2),
                         "RSI (14)": round(rsi_14, 1),
-                        "Volatility %": round(hv_30, 1),
-                        "vs 20-SMA": "Above" if current_price > sma_20 else "Below"
+                        "Realized Vol (Reality)": round(realized_vol, 1),
+                        "Implied Vol (Fear)": round(implied_vol, 1),
+                        "VRP Edge (Your Profit)": round(vrp_edge, 1)
                     })
                 except:
                     pass 
@@ -247,26 +256,29 @@ with tab_screener:
             res_df = pd.DataFrame(screener_results)
             
             if strategy_target == "Selling Puts (Oversold Stocks)":
-                filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["Volatility %"] >= min_vol)]
-                filtered_df = filtered_df.sort_values(by="RSI (14)", ascending=True) 
-                st.success(f"Found {len(filtered_df)} beaten-down candidates with rich premiums.")
+                # Oversold and High Edge
+                filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge (Your Profit)"] >= min_edge)]
+                filtered_df = filtered_df.sort_values(by="VRP Edge (Your Profit)", ascending=False) 
+                st.success(f"Found {len(filtered_df)} beaten-down candidates where fear is massively overpricing the puts.")
                 
             else:
-                filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["Volatility %"] >= min_vol)]
-                filtered_df = filtered_df.sort_values(by="RSI (14)", ascending=False) 
-                st.error(f"Found {len(filtered_df)} overbought candidates with rich premiums.")
+                # Overbought and High Edge
+                filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge (Your Profit)"] >= min_edge)]
+                filtered_df = filtered_df.sort_values(by="VRP Edge (Your Profit)", ascending=False) 
+                st.error(f"Found {len(filtered_df)} overbought candidates where hype is massively overpricing the calls.")
                 
             if not filtered_df.empty:
-                # PRO FIX: Added strict "{:.1f}" formatting for the RSI column!
                 display_df = filtered_df.style.format({
                     "Price": "${:.2f}",
                     "RSI (14)": "{:.1f}", 
-                    "Volatility %": "{:.1f}%"
+                    "Realized Vol (Reality)": "{:.1f}%",
+                    "Implied Vol (Fear)": "{:.1f}%",
+                    "VRP Edge (Your Profit)": "+{:.1f}%"
                 })
                 st.dataframe(display_df, use_container_width=True, hide_index=True)
-                st.info("👉 **Next Step:** Take the top ticker from this list, plug it into the 'Safe Zone Calculator' on the first tab, and then execute the trade on your broker!")
+                st.info("👉 **Next Step:** Target the tickers at the top. The higher the VRP Edge, the more mathematically overpriced the option premium is!")
             else:
-                st.warning("No stocks met your strict criteria. The market might be chopping sideways. Protect your capital and wait for a better setup.")
+                st.warning("No stocks currently have a high enough VRP Edge. The market might be pricing options too accurately right now.")
 
 # --- TAB 3: LEDGER ---
 with tab2:
@@ -345,7 +357,7 @@ with tab2:
 
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
-        num_rows="dynamic", use_container_width=True, key="ledger_editor_final2",
+        num_rows="dynamic", use_container_width=True, key="ledger_editor_final3",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
