@@ -18,7 +18,7 @@ st.markdown("""
 <style>
     [data-testid="metric-container"] {
         background-color: rgba(28, 131, 225, 0.05); 
-        border: 1px solid rgba(128, 128, 128, 0.2);
+        border: 1px solid rgba(128, 128, 128, 0.15);
         border-radius: 12px;
         padding: 15px;
         height: 140px; 
@@ -29,16 +29,36 @@ st.markdown("""
         text-align: center;
         margin-bottom: 15px;
     }
-    [data-testid="stMetricValue"] { font-size: 2rem !important; font-weight: 800 !important; }
-    [data-testid="stMetricDelta"] { font-size: 1rem !important; color: #888888 !important; justify-content: center !important; }
+    [data-testid="stMetricValue"] { font-size: 2.2rem !important; font-weight: 800 !important; }
+    [data-testid="stMetricDelta"] { font-size: 0.95rem !important; color: #888888 !important; justify-content: center !important; }
     [data-testid="stMetricDelta"] > svg { display: none; }
     .footer-right { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.8em; z-index: 1000; }
     
-    .creed-box { background-color: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 5px solid #2962FF; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px; }
+    .creed-box { background-color: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 6px solid #2962FF; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px; }
     .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
     .creed-text { font-size: 0.95em; line-height: 1.6; }
     
-    .regime-box { border-radius: 8px; padding: 20px; margin-top: 10px; margin-bottom: 25px; color: white; }
+    /* UNIFIED SUBTLE REGIME BOXES */
+    .regime-box { 
+        background-color: rgba(255, 255, 255, 0.02); 
+        border: 1px solid rgba(128, 128, 128, 0.1); 
+        border-left: 6px solid; 
+        border-radius: 8px; 
+        padding: 20px; 
+        margin-top: 10px; 
+        margin-bottom: 25px; 
+        color: #eee;
+    }
+    .regime-title { font-weight: 800; font-size: 1.3em; margin-bottom: 10px; margin-top:0; letter-spacing: 0.5px; }
+    .regime-text { font-size: 0.95em; line-height: 1.6; }
+    .action-highlight { font-weight: bold; }
+
+    /* Color definitions for the titles/borders */
+    .color-crash { color: #b91d47; border-left-color: #b91d47; }
+    .color-bearish { color: #e67e22; border-left-color: #e67e22; }
+    .color-bullish { color: #00b09b; border-left-color: #00b09b; }
+    .color-neutral { color: #3a7bd5; border-left-color: #3a7bd5; }
+    .color-overbought { color: #8e44ad; border-left-color: #8e44ad; }
     
     .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; }
     .sniper-title { font-size: 0.9em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
@@ -47,7 +67,7 @@ st.markdown("""
     .call-color { color: #ff4b4b; }
     .neutral-color { color: #f39c12; }
     
-    .synthesis-box { background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 15px; border-radius: 5px; margin-bottom: 20px;}
+    .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 15px; border-radius: 5px; margin-bottom: 20px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -123,7 +143,7 @@ WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NF
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🎯 Sniper Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO PLAYBOOK (Unchanged) ---
+# --- TAB 1: MACRO PLAYBOOK (NEW SUBTLE DESIGN) ---
 with tab_macro:
     head_col, btn_col = st.columns([5, 1])
     with head_col: 
@@ -213,72 +233,72 @@ with tab_macro:
         </div>
         """, unsafe_allow_html=True)
 
-        # 4. THE PLAYBOOK REGIME
+        # 4. THE PLAYBOOK REGIME (NEW SUBTLE REDESIGN)
         st.markdown("#### 📖 Actionable Strategy Playbook")
         
         if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
             st.markdown("""
-            <div class="regime-box" style="background: linear-gradient(135deg, #b91d47 0%, #800000 100%);">
-                <h3 style="color: white; margin-top: 0;">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</h3>
-                <p style="font-size: 1.1em; margin-bottom: 0;">
+            <div class="regime-box color-crash">
+                <div class="regime-title color-crash">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</div>
+                <div class="regime-text">
                 <b>What's happening:</b> Panic mode. Fear is extreme, funding is freezing, and everything is being sold for cash.<br><br>
-                <b>Your Move:</b> HOLD CASH. Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.
-                </p>
+                <span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
         elif breadth_avg <= 20 and vix_px <= 25:
              st.markdown("""
-            <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #008080 100%);">
-                <h3 style="color: white; margin-top: 0;">🎯 REGIME: OVERSOLD OPPORTUNITY</h3>
-                <p style="font-size: 1.1em; margin-bottom: 0;">
+            <div class="regime-box color-bullish">
+                <div class="regime-title color-bullish">🎯 REGIME: OVERSOLD OPPORTUNITY</div>
+                <div class="regime-text">
                 <b>What's happening:</b> The market is heavily washed out, but the VIX proves there is no systemic panic. <br><br>
-                <b>Your Move:</b> BUY THE DIP (SELL PUTS). This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.
-                </p>
+                <span class="action-highlight">Your Move: BUY THE DIP (SELL PUTS).</span> This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.
+                </div>
             </div>
             """, unsafe_allow_html=True)           
 
         elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
             st.markdown("""
-            <div class="regime-box" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">
-                <h3 style="color: white; margin-top: 0;">⚠️ REGIME: BEARISH / CORRECTION</h3>
-                <p style="font-size: 1.1em; margin-bottom: 0;">
+            <div class="regime-box color-bearish">
+                <div class="regime-title color-bearish">⚠️ REGIME: BEARISH / CORRECTION</div>
+                <div class="regime-text">
                 <b>What's happening:</b> Macro headwinds (inflation/dollar strength) are pressuring equities.<br><br>
-                <b>Your Move:</b> BE DEFENSIVE. Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.
-                </p>
+                <span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
         elif breadth_avg >= 80:
              st.markdown("""
-            <div class="regime-box" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);">
-                <h3 style="color: white; margin-top: 0;">🔥 REGIME: OVERBOUGHT / EXHAUSTED</h3>
-                <p style="font-size: 1.1em; margin-bottom: 0;">
+            <div class="regime-box color-overbought">
+                <div class="regime-title color-overbought">🔥 REGIME: OVERBOUGHT / EXHAUSTED</div>
+                <div class="regime-text">
                 <b>What's happening:</b> Greed is at a maximum. Nearly everything is trending up, making the market vulnerable to a sudden, sharp pullback.<br><br>
-                <b>Your Move:</b> TAKE PROFITS. Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.
-                </p>
+                <span class="action-highlight">Your Move: TAKE PROFITS.</span> Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.
+                </div>
             </div>
             """, unsafe_allow_html=True)           
             
         elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
             st.markdown("""
-            <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
-                <h3 style="color: white; margin-top: 0;">🚀 REGIME: EXTREME BULLISH / RISK-ON</h3>
-                <p style="font-size: 1.1em; margin-bottom: 0;">
+            <div class="regime-box color-bullish">
+                <div class="regime-title color-bullish">🚀 REGIME: EXTREME BULLISH / RISK-ON</div>
+                <div class="regime-text">
                 <b>What's happening:</b> The "Goldilocks" zone. Money is cheap, inflation is dead, and fear is nonexistent.<br><br>
-                <b>Your Move:</b> STAY LONG. Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave, but be extremely careful of sudden VIX spikes.
-                </p>
+                <span class="action-highlight">Your Move: STAY LONG.</span> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist (NVDA, TSLA, etc.). Ride the liquidity wave, but watch the Breadth dials for exhaustion.
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
         else:
             st.markdown("""
-            <div class="regime-box" style="background: linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);">
-                <h3 style="color: white; margin-top: 0;">⚖️ REGIME: NEUTRAL / RANGE-BOUND</h3>
-                <p style="font-size: 1.1em; margin-bottom: 0;">
+            <div class="regime-box color-neutral">
+                <div class="regime-title color-neutral">⚖️ REGIME: NEUTRAL / RANGE-BOUND</div>
+                <div class="regime-text">
                 <b>What's happening:</b> The market is chopping sideways, waiting for the next catalyst.<br><br>
-                <b>Your Move:</b> STOCK PICKER'S MARKET. Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.
-                </p>
+                <span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
