@@ -53,7 +53,6 @@ st.markdown("""
     .regime-text { font-size: 0.95em; line-height: 1.6; }
     .action-highlight { font-weight: bold; }
 
-    /* Color definitions for the titles/borders */
     .color-crash { color: #b91d47; border-left-color: #b91d47; }
     .color-bearish { color: #e67e22; border-left-color: #e67e22; }
     .color-bullish { color: #00b09b; border-left-color: #00b09b; }
@@ -68,6 +67,12 @@ st.markdown("""
     .neutral-color { color: #f39c12; }
     
     .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 15px; border-radius: 5px; margin-bottom: 20px;}
+    
+    /* NEW TARGET BOX STYLING */
+    .target-box-put { background-color: rgba(0, 176, 155, 0.1); border-left: 5px solid #00b09b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-box-call { background-color: rgba(255, 75, 75, 0.1); border-left: 5px solid #ff4b4b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-title { font-size: 2.2em; font-weight: 900; margin: 0; }
+    .target-sub { margin: 5px 0 0 0; color: #ccc; font-size: 1.1em; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -143,7 +148,7 @@ WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NF
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🎯 Sniper Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO PLAYBOOK (NEW SUBTLE DESIGN) ---
+# --- TAB 1: MACRO PLAYBOOK (Unchanged) ---
 with tab_macro:
     head_col, btn_col = st.columns([5, 1])
     with head_col: 
@@ -158,7 +163,6 @@ with tab_macro:
             if len(df) >= 2: return float(df['Close'].iloc[-1]), ((float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])) * 100
             return 0.0, 0.0
         
-        # 1. Fetch Data
         oil_px, oil_pct = get_macro_live("CL=F")
         dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")
         vix_px, vix_pct = get_macro_live("^VIX")
@@ -168,7 +172,6 @@ with tab_macro:
         dxy_status = "🟢 Weak" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 105 else "🔴 Strong")
         vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
 
-        # Render Top Metrics
         m1, m2, m3 = st.columns(3)
         m1.metric("🛢️ WTI Crude Oil", f"${oil_px:,.2f}", f"{oil_status} ({oil_pct:+.2f}%)", delta_color="inverse" if oil_px > 80 else "normal")
         m2.metric("💵 US Dollar (DXY)", f"{dxy_px:,.2f}", f"{dxy_status} ({dxy_pct:+.2f}%)", delta_color="inverse" if dxy_px > 105 else "normal")
@@ -176,7 +179,6 @@ with tab_macro:
 
         st.write("---")
         
-        # 2. Fetch Breadth
         sp500_sectors = ["XLK", "XLV", "XLF", "XLY", "XLC", "XLI", "XLP", "XLE", "XLU", "XLRE", "XLB"]
         nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX", "AMD", "PEP", "CSCO", "TMUS", "ADBE"]
         
@@ -209,7 +211,6 @@ with tab_macro:
 
         st.write("---")
         
-        # 3. LIVE AI SYNTHESIS ENGINE
         st.markdown("#### 🧠 Live Market Synthesis")
         
         syn_oil = "Energy prices are running hot, putting upward pressure on inflation and acting as a headwind for rate cuts." if oil_px > 85 else "Crude oil remains contained, alleviating inflation fears and supporting risk assets."
@@ -233,7 +234,6 @@ with tab_macro:
         </div>
         """, unsafe_allow_html=True)
 
-        # 4. THE PLAYBOOK REGIME (NEW SUBTLE REDESIGN)
         st.markdown("#### 📖 Actionable Strategy Playbook")
         
         if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
@@ -305,7 +305,7 @@ with tab_macro:
     except Exception as e:
         pass
 
-# --- TAB 2: SNIPER SAFE ZONES (BUG FIXED: Using f-strings) ---
+# --- TAB 2: SNIPER SAFE ZONES (MASSIVE LOGIC & UI UPGRADE) ---
 with tab_safezone:
     st.markdown("#### 🎯 Sniper Safe Zones (Math + Structure)")
     st.caption("Calculates Mathematical Expected Move and overlays it against Structural Support/Resistance data.")
@@ -337,11 +337,15 @@ with tab_safezone:
                     math_floor = px - exp_move_dollar
                     math_ceil = px + exp_move_dollar
                     
-                    # 2. PRICE ACTION
+                    # 2. PRICE ACTION (Fixed: Segmented Timeframes)
+                    # S1/R1 = Last 30 Days
                     s1 = hist_1y['Low'].tail(30).min()
                     r1 = hist_1y['High'].tail(30).max()
-                    s2 = hist_1y['Low'].tail(126).min() 
-                    r2 = hist_1y['High'].tail(126).max()
+                    
+                    # S2/R2 = Older Macro Data (6 months ago up to 30 days ago)
+                    older_data = hist_1y.iloc[-126:-30]
+                    s2 = older_data['Low'].min() if not older_data.empty else s1
+                    r2 = older_data['High'].max() if not older_data.empty else r1
                     
                     # 3. VOLUME PROFILE 
                     hist_6m = hist_1y.tail(126).copy()
@@ -352,6 +356,7 @@ with tab_safezone:
                     
                     # 4. OPTIONS WALLS 
                     put_wall_str, call_wall_str = "N/A", "N/A"
+                    put_wall, call_wall = None, None
                     try:
                         avail_exps = yf_tk.options
                         if avail_exps:
@@ -368,12 +373,22 @@ with tab_safezone:
                                 call_wall_str = f"${call_wall:.2f}"
                     except: pass 
                     
+                    # CALCULATE THE ULTIMATE SNIPER STRIKES
+                    # Safest Put is the lowest number between the Math and Structural Support S1.
+                    target_put = min(math_floor, s1)
+                    if put_wall is not None and put_wall < px:
+                        target_put = min(target_put, put_wall)
+                        
+                    # Safest Call is the highest number between Math and Resistance R1.
+                    target_call = max(math_ceil, r1)
+                    if call_wall is not None and call_wall > px:
+                        target_call = max(target_call, call_wall)
+                    
                     st.write("---")
                     st.markdown(f"### **{calc_tk} X-Ray Analysis | Current Price: ${px:.2f}**")
                     
                     col_m, col_s1, col_s2, col_s3 = st.columns(4)
                     
-                    # PRO FIX: Converted all of these to f-strings to prevent the '%' crash!
                     with col_m:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">1. The Math (68% Move)</div>
@@ -385,8 +400,8 @@ with tab_safezone:
                     with col_s1:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">2. Price Action</div>
-                            <div style="color:#00b09b;"><b>S1:</b> ${s1:.2f} <br><b>S2:</b> ${s2:.2f}</div>
-                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1:</b> ${r1:.2f} <br><b>R2:</b> ${r2:.2f}</div>
+                            <div style="color:#00b09b;"><b>S1 (30d):</b> ${s1:.2f} <br><b>S2 (6mo):</b> ${s2:.2f}</div>
+                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1 (30d):</b> ${r1:.2f} <br><b>R2 (6mo):</b> ${r2:.2f}</div>
                             <div style="font-size:0.8em; color:gray; margin-top:5px;">Historical Bounces</div>
                             </div>""", unsafe_allow_html=True)
                             
@@ -406,10 +421,22 @@ with tab_safezone:
                             </div>""", unsafe_allow_html=True)
                     
                     st.write("---")
-                    st.markdown("#### 🎯 Sniper Conclusion")
-                    out_put, out_call = st.columns(2)
-                    with out_put: st.info(f"**🟢 Put Seller (Bullish/Neutral):**\nThe math tells you it is statistically safe down to **${math_floor:.2f}**. However, structural buyers are sitting at S1 (**${s1:.2f}**). \n\n**Pro Move:** Look to sell the strike that is tucked safely underneath both the Math Floor *and* S1.")
-                    with out_call: st.error(f"**🔴 Call Seller (Bearish/Neutral):**\nThe math tells you it is statistically safe up to **${math_ceil:.2f}**. However, structural sellers are sitting at R1 (**${r1:.2f}**). \n\n**Pro Move:** Look to sell the strike that is safely above both the Math Ceiling *and* R1.")
+                    st.markdown("#### 🎯 Ultimate Target Strikes")
+                    
+                    # DIRECT NUMBER OUTPUT (Vertically Stacked to prevent overlapping)
+                    st.markdown(f"""
+                    <div class="target-box-put">
+                        <div class="target-title" style="color: #00b09b;">🟢 TARGET PUT STRIKE: ${target_put:.2f} (or lower)</div>
+                        <div class="target-sub">Safest mathematical floor. Dynamically tucked beneath the Math probability (${math_floor:.2f}), Structural S1 (${s1:.2f}), and Options Wall ({put_wall_str}).</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.markdown(f"""
+                    <div class="target-box-call">
+                        <div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL STRIKE: ${target_call:.2f} (or higher)</div>
+                        <div class="target-sub">Safest mathematical ceiling. Dynamically placed above the Math probability (${math_ceil:.2f}), Structural R1 (${r1:.2f}), and Options Wall ({call_wall_str}).</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
