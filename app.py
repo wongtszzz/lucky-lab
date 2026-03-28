@@ -166,7 +166,6 @@ with tab1:
         except Exception as e:
             st.caption("*(Yahoo Timeout - Auto-switched to Alpaca ETF Feed)*")
             try:
-                # PRO FIX: Use Snapshot for the fallback to avoid the weekend ask_price trap
                 req = StockSnapshotRequest(symbol_or_symbols=["SPY", "VIXY"], feed=DataFeed.IEX)
                 snaps = stock_client.get_stock_snapshot(req)
                 
@@ -203,14 +202,12 @@ with tab1:
         if st.button("🔬 Analyze & Scan", type="primary", use_container_width=True):
             with st.spinner(f"Running Smart Target Math for {tk}..."):
                 try:
-                    # PRO FIX: Use Yahoo Finance to get the TRUE closing price!
                     yf_tk = yf.Ticker(tk)
                     hist_df = yf_tk.history(period='5d')
                     
                     if not hist_df.empty:
                         px = float(hist_df['Close'].iloc[-1])
                     else:
-                        # Fallback to Alpaca Last Trade Price (Avoids the ask_price trap)
                         snap_req = StockSnapshotRequest(symbol_or_symbols=[tk], feed=DataFeed.IEX)
                         snap = stock_client.get_stock_snapshot(snap_req)[tk]
                         px = snap.latest_trade.price if snap.latest_trade and snap.latest_trade.price > 0 else snap.previous_daily_bar.close
@@ -427,8 +424,17 @@ with tab_chart:
         else:
             st.info("👈 Use the toggles to clean up the chart, then click 'Draw Chart'.")
 
-# --- LEDGER (100% UNTOUCHED) ---
+# --- LEDGER (UPDATED WITH CREED) ---
 with tab2:
+    
+    # --- NEW TRADER REMINDERS ---
+    st.warning("""
+    🧠 **The Quants Creed:**
+    1. **Hope is not a strategy.** Cut your losses mechanically.
+    2. **Watch the clock.** Beware of Market-on-Close (MOC) volatility and the notorious Friday Flush.
+    """)
+    st.write("---")
+
     df_j = st.session_state.journal
     
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
@@ -522,7 +528,7 @@ with tab2:
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_editor_v34",
+        key="ledger_editor_v35",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
