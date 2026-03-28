@@ -7,16 +7,11 @@ import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
-from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
-from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest, StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
-from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
 
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Quants Lab", page_icon="🧪", layout="wide")
 
-# PRO HACK: Added custom CSS for the Creed Box to make it look like a sleek terminal!
 st.markdown("""
 <style>
     [data-testid="metric-container"] {
@@ -59,19 +54,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### 🧪 Lucky Quants Lab")
+st.markdown("### 🧪 Lucky Quants Lab | Pre-Market War Room")
 st.divider()
 
-# API Connections
+# API Connections (Stripped out Alpaca to maximize speed; using yfinance for macro data)
 try:
-    API_KEY = st.secrets["ALPACA_KEY"]
-    SECRET_KEY = st.secrets["ALPACA_SECRET"]
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
-    
-    opt_client = OptionHistoricalDataClient(API_KEY, SECRET_KEY)
-    stock_client = StockHistoricalDataClient(API_KEY, SECRET_KEY)
-    
     gh = Github(GITHUB_TOKEN)
     repo = gh.get_repo(GITHUB_REPO)
 except Exception as e:
@@ -133,194 +122,116 @@ if 'journal' not in st.session_state or set(st.session_state.journal.columns) !=
     st.session_state.journal = load_journal()
     st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Global variables
-current_vix = 20.0
-market_daily_expected_pct = 0.0
+# Global variable for the macro VIX
+if 'current_vix' not in st.session_state:
+    st.session_state.current_vix = 20.0
 
 # --- 3. UI TABS ---
-tab1, tab_chart, tab2 = st.tabs(["🔍 Strategy Optimizer", "📈 Chart Analysis", "📓 Lucky Ledger"])
+tab1, tab_chart, tab2 = st.tabs(["⚡ Macro & Safe Zones", "📈 Technical Battlefield", "📓 Lucky Ledger"])
 
-# --- OPTIMIZER (50/50 Market & Strategy Split) ---
+# --- TAB 1: MACRO & IDEA GENERATION (LIGHTNING FAST) ---
 with tab1:
-    col_market, col_opt = st.columns(2, gap="large")
+    col_market, col_calc = st.columns(2, gap="large")
     
     with col_market:
         head_col, btn_col = st.columns([3, 1])
         with head_col:
-            st.markdown("#### 🔮 Market Oracle")
+            st.markdown("#### 🌍 Market Temperature")
         with btn_col:
             st.button("🔄 Refresh", use_container_width=True)
             
-        st.caption("Calculates tomorrow's expected ± % move based on real-time VIX.")
+        st.caption("Live baseline metrics for the broader market.")
         
         try:
-            def get_yf_close(symbol):
+            def get_yf_metrics(symbol):
                 t = yf.Ticker(symbol)
                 df = t.history(period='5d')
-                if not df.empty:
-                    return float(df['Close'].iloc[-1])
-                return 0.0
+                if len(df) >= 2:
+                    prev = float(df['Close'].iloc[-2])
+                    curr = float(df['Close'].iloc[-1])
+                    pct = ((curr - prev) / prev) * 100
+                    return curr, pct
+                return 0.0, 0.0
             
-            spy_px = get_yf_close("SPY")
-            vix_px = get_yf_close("^VIX")
+            spy_px, spy_pct = get_yf_metrics("SPY")
+            qqq_px, qqq_pct = get_yf_metrics("QQQ")
+            vix_px, vix_pct = get_yf_metrics("^VIX")
             
-            if spy_px == 0.0 or vix_px == 0.0:
-                raise ValueError("Yahoo Timeout")
-                
-            current_vix = vix_px
-            market_daily_expected_pct = current_vix / np.sqrt(252)
-            daily_expected_dollar = spy_px * (market_daily_expected_pct / 100)
-            
-            exp_high = spy_px + daily_expected_dollar
-            exp_low = spy_px - daily_expected_dollar
+            st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
             
             m1, m2 = st.columns(2)
-            m1.metric("SPY Current Price", f"${spy_px:,.2f}")
-            m2.metric("Tomorrow's Move", f"± {market_daily_expected_pct:.2f}%", f"± ${daily_expected_dollar:.2f}", delta_color="off")
+            m1.metric("S&P 500 (SPY)", f"${spy_px:,.2f}", f"{spy_pct:+.2f}%")
+            m2.metric("Nasdaq (QQQ)", f"${qqq_px:,.2f}", f"{qqq_pct:+.2f}%")
+            
+            market_daily_expected_pct = st.session_state.current_vix / np.sqrt(252)
             
             m3, m4 = st.columns(2)
-            m3.metric("Expected High (Ceiling)", f"${exp_high:,.2f}", "Resistance", delta_color="normal")
-            m4.metric("Expected Low (Floor)", f"${exp_low:,.2f}", "Support", delta_color="inverse")
+            m3.metric("Volatility (VIX)", f"{vix_px:,.2f}", f"{vix_pct:+.2f}%", delta_color="inverse")
+            m4.metric("SPY 1-Day Exp. Move", f"± {market_daily_expected_pct:.2f}%", "Rule of 16 Baseline", delta_color="off")
             
-            st.info(f"💡 **SPY Baseline:** The broader market is pricing in a **{market_daily_expected_pct:.2f}%** move for tomorrow.")
+            if vix_px > 25:
+                st.warning("🚨 **High Volatility:** The VIX is elevated. Premiums are rich, but market conditions are dangerous. Size down your trades.")
+            elif vix_px < 15:
+                st.info("📉 **Low Volatility:** The market is calm. Premiums are cheap. Be careful not to over-leverage just to chase yield.")
+            else:
+                st.success("⚖️ **Normal Volatility:** Market is in a standard operating range.")
 
         except Exception as e:
-            st.caption("*(Yahoo Timeout - Auto-switched to Alpaca ETF Feed)*")
-            try:
-                req = StockSnapshotRequest(symbol_or_symbols=["SPY", "VIXY"], feed=DataFeed.IEX)
-                snaps = stock_client.get_stock_snapshot(req)
-                
-                spy_px = snaps["SPY"].latest_trade.price if snaps["SPY"].latest_trade else snaps["SPY"].previous_daily_bar.close
-                vixy_px = snaps["VIXY"].latest_trade.price if snaps["VIXY"].latest_trade else snaps["VIXY"].previous_daily_bar.close
-                
-                current_vix = vixy_px * 1.5 
-                market_daily_expected_pct = current_vix / np.sqrt(252)
-                daily_expected_dollar = spy_px * (market_daily_expected_pct / 100)
-                
-                exp_high = spy_px + daily_expected_dollar
-                exp_low = spy_px - daily_expected_dollar
-                
-                m1, m2 = st.columns(2)
-                m1.metric("SPY Current Price", f"${spy_px:,.2f}")
-                m2.metric("Tomorrow's Move (Est.)", f"± {market_daily_expected_pct:.2f}%", f"± ${daily_expected_dollar:.2f}", delta_color="off")
-                
-                m3, m4 = st.columns(2)
-                m3.metric("Expected High", f"${exp_high:,.2f}", "Resistance")
-                m4.metric("Expected Low", f"${exp_low:,.2f}", "Support", delta_color="inverse")
-                
-            except:
-                st.warning("All market data feeds are currently down.")
+            st.error(f"Error fetching market data: {e}")
 
-    with col_opt:
-        st.markdown("#### 🎯 Smart Targeting Engine")
-        st.caption("Calculates the exact Safe Zone for your specific Expiry Date.")
+    with col_calc:
+        st.markdown("#### 🛡️ Safe Zone Calculator")
+        st.caption("Instantly calculates your mathematical floor and ceiling for any ticker.")
         
-        c1, c2, c3 = st.columns(3)
-        tk = c1.text_input("Ticker", value="TSM", key="scanner_tk").upper()
-        target_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
-        opt_filter = c3.selectbox("Show", ["Puts Only", "Calls Only", "Both"])
+        c1, c2 = st.columns(2)
+        calc_tk = c1.text_input("Ticker", value="TSLA", key="calc_tk").upper()
+        calc_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
         
-        if st.button("🔬 Analyze & Scan", type="primary", use_container_width=True):
-            with st.spinner(f"Running Smart Target Math for {tk}..."):
+        if st.button("🧮 Calculate Safe Zones", type="primary", use_container_width=True):
+            with st.spinner(f"Crunching quant math for {calc_tk}..."):
                 try:
-                    yf_tk = yf.Ticker(tk)
+                    yf_tk = yf.Ticker(calc_tk)
                     hist_df = yf_tk.history(period='5d')
                     
-                    if not hist_df.empty:
+                    if hist_df.empty:
+                        st.error("Invalid Ticker or No Data Found.")
+                    else:
                         px = float(hist_df['Close'].iloc[-1])
-                    else:
-                        snap_req = StockSnapshotRequest(symbol_or_symbols=[tk], feed=DataFeed.IEX)
-                        snap = stock_client.get_stock_snapshot(snap_req)[tk]
-                        px = snap.latest_trade.price if snap.latest_trade and snap.latest_trade.price > 0 else snap.previous_daily_bar.close
-                    
-                    try:
-                        beta = yf_tk.info.get('beta', 1.0)
-                        if beta is None: beta = 1.0
-                    except:
-                        beta = 1.0
-                    
-                    days_to_exp = (target_ex - datetime.now().date()).days
-                    if days_to_exp <= 0: days_to_exp = 1 
-                    
-                    stock_iv_proxy = current_vix * beta
-                    exp_move_pct = (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
-                    exp_move_dollar = px * exp_move_pct
-                    
-                    safe_put_floor = px - exp_move_dollar
-                    safe_call_ceiling = px + exp_move_dollar
-                    
-                    st.success(f"**{tk} Current Price:** ${px:.2f} | **{days_to_exp} Days to Expiry**")
-                    
-                    t1, t2 = st.columns(2)
-                    t1.info(f"🛡️ **Safe Put Zone:** Below **${safe_put_floor:.2f}**")
-                    t2.error(f"🛡️ **Safe Call Zone:** Above **${safe_call_ceiling:.2f}**")
-                    
-                    chain_req = OptionChainRequest(underlying_symbol=tk, expiration_date=target_ex, feed=OptionsFeed.INDICATIVE)
-                    chain = opt_client.get_option_chain(chain_req)
-                    
-                    res = []
-                    for s, d in chain.items():
-                        stk_val = float(s[-8:])/1000
-                        opt_type = "Put" if "P" in s else "Call"
                         
-                        if opt_filter == "Puts Only" and opt_type == "Call": continue
-                        if opt_filter == "Calls Only" and opt_type == "Put": continue
+                        # Get Beta
+                        try:
+                            beta = yf_tk.info.get('beta', 1.0)
+                            if beta is None: beta = 1.0
+                        except:
+                            beta = 1.0
+                            
+                        # Days to Expiry Math
+                        days_to_exp = (calc_ex - datetime.now().date()).days
+                        if days_to_exp <= 0: days_to_exp = 1 
                         
-                        if px * 0.80 <= stk_val <= px * 1.20:
-                            
-                            bid = d.latest_quote.bid_price if d.latest_quote else 0.0
-                            ask = d.latest_quote.ask_price if d.latest_quote else 0.0
-                            mid = (bid + ask) / 2 if (bid + ask) > 0 else 0.0
-                            
-                            delta = d.greeks.delta if d.greeks and d.greeks.delta is not None else 0.0
-                            iv = d.implied_volatility if d.implied_volatility is not None else 0.0
-                            roc = (mid / stk_val) * 100 if stk_val > 0 else 0.0
-                            dist_pct = ((stk_val - px) / px) * 100
-                            
-                            res.append({
-                                "Type": opt_type,
-                                "Strike": stk_val,
-                                "Dist %": dist_pct,
-                                "Delta": delta,
-                                "Mid Price": mid,
-                                "ROC %": roc,
-                                "IV %": iv * 100
-                            })
-                            
-                    st.caption("🟢 **Golden Weekly Setup:** Outside Safe Zone + Delta (0.05-0.25)")
-                    
-                    if res:
-                        df_res = pd.DataFrame(res).sort_values(by=["Type", "ROC %"], ascending=[False, False])
+                        # THE QUANT FORMULA
+                        stock_iv_proxy = st.session_state.current_vix * beta
+                        exp_move_pct = (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
+                        exp_move_dollar = px * exp_move_pct
                         
-                        def highlight_golden_trades(row):
-                            try:
-                                is_safe_put = (row['Type'] == 'Put') and (float(row['Strike']) <= safe_put_floor)
-                                is_safe_call = (row['Type'] == 'Call') and (float(row['Strike']) >= safe_call_ceiling)
-                                is_safe_zone = is_safe_put or is_safe_call
-                                
-                                is_good_delta = 0.05 <= abs(float(row['Delta'])) <= 0.25
-                                
-                                if is_safe_zone and is_good_delta:
-                                    return ['background-color: rgba(39, 174, 96, 0.4); font-weight: bold;'] * len(row)
-                            except: pass
-                            return [''] * len(row)
-                            
-                        styled_df = df_res.style.apply(highlight_golden_trades, axis=1).format({
-                            "Strike": "{:.2f}",
-                            "Delta": "{:.3f}",
-                            "Mid Price": "${:.2f}",
-                            "ROC %": "{:.2f}%",
-                            "IV %": "{:.1f}%",
-                            "Dist %": "{:+.1f}%" 
-                        })
+                        safe_put_floor = px - exp_move_dollar
+                        safe_call_ceiling = px + exp_move_dollar
                         
-                        st.dataframe(styled_df, use_container_width=True, hide_index=True)
-                    else:
-                        st.warning(f"No options found for {tk} expiring on {target_ex}.")
+                        st.markdown(f"### **{calc_tk} Current Price: ${px:.2f}**")
+                        st.write(f"**Beta:** {beta:.2f} | **Timeframe:** {days_to_exp} Days | **Expected Swing:** ± {exp_move_pct*100:.1f}% (± ${exp_move_dollar:.2f})")
+                        
+                        # Big visual output for the trader
+                        t1, t2 = st.columns(2)
+                        with t1:
+                            st.info(f"🟢 **SAFE PUT FLOOR**\n# **${safe_put_floor:.2f}**\n*Do not sell puts above this price.*")
+                        with t2:
+                            st.error(f"🔴 **SAFE CALL CEILING**\n# **${safe_call_ceiling:.2f}**\n*Do not sell calls below this price.*")
+                            
+                        st.caption("💡 *Take these numbers to your broker (Futu/IBKR) and look for the highest Premium/ROC sitting OUTSIDE these zones!*")
                 except Exception as e:
-                    st.error(f"Error fetching data: {e}")
+                    st.error(f"Calculation Error: {e}")
 
-# --- NEW TAB: CHART ANALYSIS ---
+# --- TAB 2: CHART ANALYSIS (UNCHANGED) ---
 with tab_chart:
     st.markdown("#### 📈 Technical Battlefield")
     st.caption("Visualize 1-Year trends, multiple EMAs, ATR Volatility, and Keltner Channels.")
@@ -337,7 +248,6 @@ with tab_chart:
         show_sr = st.checkbox("Show Support/Resistance", value=True)
         
         draw_btn = st.button("📊 Draw Chart", use_container_width=True, type="primary")
-        
         st.write("---")
         atr_placeholder = st.empty()
         
@@ -414,41 +324,23 @@ with tab_chart:
                             x=df_chart.index, y=df_chart['Volume'], name='Volume', marker_color=vol_colors, marker_line_width=0
                         ), row=2, col=1)
 
-                        fig.update_xaxes(
-                            rangebreaks=[dict(bounds=["sat", "mon"])],
-                            showgrid=False, zeroline=False
-                        )
+                        fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], showgrid=False, zeroline=False)
                         fig.update_yaxes(showgrid=True, gridcolor='rgba(128,128,128,0.1)', zeroline=False)
 
                         fig.update_layout(
                             title=f"{chart_tk} Technical Analysis | Current Price: ${current_close:.2f}",
-                            template="plotly_white",
-                            height=750,
-                            margin=dict(l=0, r=0, t=60, b=0),
-                            showlegend=True, 
-                            legend=dict(
-                                orientation="h", 
-                                yanchor="bottom", 
-                                y=1.02, 
-                                xanchor="right", 
-                                x=1,
-                                traceorder="normal"
-                            ),
-                            xaxis_rangeslider_visible=False,
-                            bargap=0.1,
-                            hovermode="x unified" 
+                            template="plotly_white", height=750, margin=dict(l=0, r=0, t=60, b=0),
+                            showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, traceorder="normal"),
+                            xaxis_rangeslider_visible=False, bargap=0.1, hovermode="x unified" 
                         )
-                        
                         st.plotly_chart(fig, use_container_width=True)
                 except Exception as e:
                     st.error(f"Error generating chart: {e}")
         else:
             st.info("👈 Use the toggles to clean up the chart, then click 'Draw Chart'.")
 
-# --- LEDGER (UPDATED WITH SLEEK HTML BOX) ---
+# --- TAB 3: LEDGER (UNCHANGED) ---
 with tab2:
-    
-    # --- PRO HACK: Custom sleek HTML replacing the default yellow warning box ---
     st.markdown("""
     <div class="creed-box">
         <div class="creed-title">🧠 The Quants Creed</div>
@@ -460,14 +352,11 @@ with tab2:
     """, unsafe_allow_html=True)
 
     df_j = st.session_state.journal
-    
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum()
-    
     total_closed = len(realized_df)
     wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
     win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
-    
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     capital_at_risk = (pd.to_numeric(active_df["Strike"]) * 100 * pd.to_numeric(active_df["Qty"])).sum()
@@ -478,7 +367,6 @@ with tab2:
     
     df_j['temp_exp'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
     this_week_df = df_j[(df_j['temp_exp'] >= start_of_week) & (df_j['temp_exp'] <= end_of_week)]
-    
     weekly_profit = this_week_df["Premium"].sum()
     
     if not this_week_df.empty:
@@ -500,7 +388,6 @@ with tab2:
     with st.expander("➕ Log New Trade", expanded=True):
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3, l4 = st.columns(4)
-            
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
             n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=7))
             n_ty = l3.selectbox("Type", ["Short Put", "Short Call"])
@@ -519,7 +406,6 @@ with tab2:
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
                     stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Active"
                     new_row = pd.DataFrame([{"Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat}])
-                    
                     st.session_state.journal = pd.concat([df_j.drop(columns=['temp_exp'], errors='ignore'), new_row], ignore_index=True)
                     save_journal(st.session_state.journal)
                     st.rerun()
@@ -535,14 +421,12 @@ with tab2:
         def update_row(r):
             open_p, close_p = float(r["Open Price"]), float(r["Close Price"])
             p = round(((open_p - close_p) * 100 * int(r["Qty"])) - float(r["Commission"]), 2)
-            
             try: ex_d = pd.to_datetime(r["Expiry"]).date()
             except: ex_d = datetime.now().date()
             
             if close_p > 0: s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
             elif ex_d < datetime.now().date(): s = "Expired (Win)"
             else: s = "Open / Active"
-            
             return pd.Series([p, s])
         
         current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
@@ -550,9 +434,7 @@ with tab2:
 
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
-        num_rows="dynamic", 
-        use_container_width=True, 
-        key="ledger_editor_v36",
+        num_rows="dynamic", use_container_width=True, key="ledger_editor_final",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
