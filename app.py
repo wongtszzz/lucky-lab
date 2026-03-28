@@ -218,24 +218,20 @@ with tab_screener:
             for ticker in WATCHLIST:
                 try:
                     t_data = yf.Ticker(ticker)
-                    # Pull 2 months of data to calculate 14-day RSI and 30-day Volatility
                     df = t_data.history(period="2mo")
                     if len(df) < 30: continue
                     
                     current_price = df['Close'].iloc[-1]
                     
-                    # Math: 30-Day Historical Volatility
                     daily_returns = df['Close'].pct_change().dropna()
                     hv_30 = daily_returns.tail(30).std() * np.sqrt(252) * 100
                     
-                    # Math: 14-Day RSI
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                     rs = gain / loss
                     rsi_14 = 100 - (100 / (1 + rs.iloc[-1]))
                     
-                    # Math: 20-Day SMA for Trend
                     sma_20 = df['Close'].rolling(window=20).mean().iloc[-1]
                     
                     screener_results.append({
@@ -246,27 +242,25 @@ with tab_screener:
                         "vs 20-SMA": "Above" if current_price > sma_20 else "Below"
                     })
                 except:
-                    pass # Skip tickers that fail to load
+                    pass 
             
             res_df = pd.DataFrame(screener_results)
             
-            # Apply User Filters
             if strategy_target == "Selling Puts (Oversold Stocks)":
-                # We want RSI < 45 (beaten down) and High Volatility
                 filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["Volatility %"] >= min_vol)]
-                filtered_df = filtered_df.sort_values(by="RSI (14)", ascending=True) # Lowest RSI at the top
+                filtered_df = filtered_df.sort_values(by="RSI (14)", ascending=True) 
                 st.success(f"Found {len(filtered_df)} beaten-down candidates with rich premiums.")
                 
             else:
-                # We want RSI > 60 (over-extended) and High Volatility
                 filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["Volatility %"] >= min_vol)]
-                filtered_df = filtered_df.sort_values(by="RSI (14)", ascending=False) # Highest RSI at the top
+                filtered_df = filtered_df.sort_values(by="RSI (14)", ascending=False) 
                 st.error(f"Found {len(filtered_df)} overbought candidates with rich premiums.")
                 
             if not filtered_df.empty:
-                # Format dataframe for display
+                # PRO FIX: Added strict "{:.1f}" formatting for the RSI column!
                 display_df = filtered_df.style.format({
                     "Price": "${:.2f}",
+                    "RSI (14)": "{:.1f}", 
                     "Volatility %": "{:.1f}%"
                 })
                 st.dataframe(display_df, use_container_width=True, hide_index=True)
