@@ -37,6 +37,7 @@ st.markdown("""
     .creed-box { background-color: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 5px solid #2962FF; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px; }
     .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
     .creed-text { font-size: 0.95em; line-height: 1.6; }
+    
     .regime-box { border-radius: 8px; padding: 20px; margin-top: 10px; margin-bottom: 25px; color: white; }
     
     .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; }
@@ -45,6 +46,8 @@ st.markdown("""
     .put-color { color: #00b09b; }
     .call-color { color: #ff4b4b; }
     .neutral-color { color: #f39c12; }
+    
+    .synthesis-box { background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 15px; border-radius: 5px; margin-bottom: 20px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,7 +63,6 @@ try:
     
     opt_client = OptionHistoricalDataClient(API_KEY, SECRET_KEY)
     stock_client = StockHistoricalDataClient(API_KEY, SECRET_KEY)
-    
     gh = Github(GITHUB_TOKEN)
     repo = gh.get_repo(GITHUB_REPO)
 except Exception as e:
@@ -96,8 +98,7 @@ def save_journal(df):
         except:
             repo.create_file(FILE_PATH, "Initial commit", csv_content)
         st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    except Exception as e:
-        pass
+    except: pass
 
 def load_journal():
     try:
@@ -109,22 +110,20 @@ def load_journal():
                 if c == "Date": df[c] = datetime.now().strftime("%Y-%m-%d")
                 else: df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
         return sort_ledger(df[COLS])
-    except Exception as e:
-        return pd.DataFrame(columns=COLS)
+    except: return pd.DataFrame(columns=COLS)
 
 if 'journal' not in st.session_state: 
     st.session_state.journal = load_journal()
     st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-if 'current_vix' not in st.session_state:
-    st.session_state.current_vix = 20.0
+if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🎯 Sniper Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO PLAYBOOK (Unchanged) ---
+# --- TAB 1: MACRO PLAYBOOK (SYNCHRONIZED LOGIC) ---
 with tab_macro:
     head_col, btn_col = st.columns([5, 1])
     with head_col: 
@@ -139,22 +138,25 @@ with tab_macro:
             if len(df) >= 2: return float(df['Close'].iloc[-1]), ((float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])) * 100
             return 0.0, 0.0
         
+        # 1. Fetch Data
         oil_px, oil_pct = get_macro_live("CL=F")
         dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")
         vix_px, vix_pct = get_macro_live("^VIX")
         st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
         
-        oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 90 else "🔴 Spiking")
-        dxy_status = "🟢 Weak" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 106 else "🔴 Strong")
+        oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 85 else "🔴 Spiking")
+        dxy_status = "🟢 Weak" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 105 else "🔴 Strong")
         vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
 
+        # Render Top Metrics
         m1, m2, m3 = st.columns(3)
         m1.metric("🛢️ WTI Crude Oil", f"${oil_px:,.2f}", f"{oil_status} ({oil_pct:+.2f}%)", delta_color="inverse" if oil_px > 80 else "normal")
-        m2.metric("💵 US Dollar (DXY)", f"{dxy_px:,.2f}", f"{dxy_status} ({dxy_pct:+.2f}%)", delta_color="inverse" if dxy_px > 106 else "normal")
+        m2.metric("💵 US Dollar (DXY)", f"{dxy_px:,.2f}", f"{dxy_status} ({dxy_pct:+.2f}%)", delta_color="inverse" if dxy_px > 105 else "normal")
         m3.metric("📉 Volatility (VIX)", f"{vix_px:,.2f}", f"{vix_status} ({vix_pct:+.2f}%)", delta_color="inverse" if vix_px > 25 else "normal")
 
         st.write("---")
-        st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
+        
+        # 2. Fetch Breadth
         sp500_sectors = ["XLK", "XLV", "XLF", "XLY", "XLC", "XLI", "XLP", "XLE", "XLU", "XLRE", "XLB"]
         nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX", "AMD", "PEP", "CSCO", "TMUS", "ADBE"]
         
@@ -178,23 +180,120 @@ with tab_macro:
                 
         s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
         nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
-        
-        b1, b2 = st.columns(2)
-        b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
-        b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
-        
         breadth_avg = (s5tw_pct + nctw_pct) / 2
         
-        if breadth_avg >= 80: st.error(f"🔥 OVERBOUGHT: The rally is exhausted across both indices. Selling calls is mathematically safer here.")
-        elif breadth_avg <= 20:
-            if vix_px > 30: st.warning(f"⚠️ CAPITULATION: The market is washed out, BUT VIX is in pure panic mode. Do NOT sell puts yet. Wait for VIX to drop below 25.")
-            else: st.success(f"🧊 OVERSOLD: Fear is contained. This is the optimal time to sell Puts on high-quality tech.")
-        else: st.info(f"⚖️ NEUTRAL: The market has healthy, mixed participation. Proceed with standard macro strategies.")
+        st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
+        b1, b2 = st.columns(2)
+        
+        b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
+        b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
+
+        st.write("---")
+        
+        # 3. LIVE AI SYNTHESIS ENGINE (Synchronized to 80/20 Thresholds)
+        st.markdown("#### 🧠 Live Market Synthesis")
+        
+        syn_oil = "Energy prices are running hot, putting upward pressure on inflation and acting as a headwind for rate cuts." if oil_px > 85 else "Crude oil remains contained, alleviating inflation fears and supporting risk assets."
+        syn_dxy = "The US Dollar is showing strength, tightening global liquidity and pressuring multinational tech earnings." if dxy_px > 105 else "A weaker dollar is currently providing a highly favorable liquidity environment for equities."
+        syn_vix = "However, the VIX is elevated, indicating institutional funds are actively buying downside protection. Fear is present in the order book." if vix_px > 25 else "Volatility is crushed, showing market complacency and a clear 'risk-on' environment."
+        
+        # Ironclad Breadth + VIX Logic Sync
+        if breadth_avg >= 80: 
+            syn_brd = "Under the hood, participation is exceptionally strong (Overbought). The rally is mathematically exhausted and highly vulnerable to a sudden pullback."
+        elif breadth_avg <= 20: 
+            if vix_px > 30:
+                syn_brd = "Market breadth is severely washed out (Oversold), BUT the VIX indicates pure panic. This is capitulation, not a safe entry."
+            else:
+                syn_brd = "Market breadth is severely washed out (Oversold) while fear (VIX) remains contained, creating a rare structural buying opportunity."
+        else: 
+            syn_brd = "Market breadth is healthy and neutral, showing a standard rotation of capital between sectors."
+
+        st.markdown(f"""
+        <div class="synthesis-box">
+            <b>Current Conditions:</b> {syn_oil} {syn_dxy} {syn_vix} <br><br>
+            <b>Internal Health:</b> {syn_brd}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 4. THE PLAYBOOK REGIME (Synchronized to 80/20 Thresholds)
+        st.markdown("#### 📖 Actionable Strategy Playbook")
+        
+        # Priority 1: Crash/Panic
+        if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #b91d47 0%, #800000 100%);">
+                <h3 style="color: white; margin-top: 0;">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>What's happening:</b> Panic mode. Fear is extreme, funding is freezing, and everything is being sold for cash.<br><br>
+                <b>Your Move:</b> HOLD CASH. Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Priority 2: Safe Oversold Opportunity
+        elif breadth_avg <= 20 and vix_px <= 25:
+             st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #008080 100%);">
+                <h3 style="color: white; margin-top: 0;">🎯 REGIME: OVERSOLD OPPORTUNITY</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>What's happening:</b> The market is heavily washed out, but the VIX proves there is no systemic panic. <br><br>
+                <b>Your Move:</b> BUY THE DIP (SELL PUTS). This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)           
+
+        # Priority 3: Bearish Macro
+        elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">
+                <h3 style="color: white; margin-top: 0;">⚠️ REGIME: BEARISH / CORRECTION</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>What's happening:</b> Macro headwinds (inflation/dollar strength) are pressuring equities.<br><br>
+                <b>Your Move:</b> BE DEFENSIVE. Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Priority 4: Overbought Warning
+        elif breadth_avg >= 80:
+             st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);">
+                <h3 style="color: white; margin-top: 0;">🔥 REGIME: OVERBOUGHT / EXHAUSTED</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>What's happening:</b> Greed is at a maximum. Nearly everything is trending up, making the market vulnerable to a sudden, sharp pullback.<br><br>
+                <b>Your Move:</b> TAKE PROFITS. Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)           
+            
+        # Priority 5: Perfect Bull Market
+        elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
+                <h3 style="color: white; margin-top: 0;">🚀 REGIME: EXTREME BULLISH / RISK-ON</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>What's happening:</b> The "Goldilocks" zone. Money is cheap, inflation is dead, and fear is nonexistent.<br><br>
+                <b>Your Move:</b> STAY LONG. Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave, but be extremely careful of sudden VIX spikes.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Default: Chop
+        else:
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);">
+                <h3 style="color: white; margin-top: 0;">⚖️ REGIME: NEUTRAL / RANGE-BOUND</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>What's happening:</b> The market is chopping sideways, waiting for the next catalyst.<br><br>
+                <b>Your Move:</b> STOCK PICKER'S MARKET. Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
     except Exception as e:
         pass
 
-# --- TAB 2: SNIPER SAFE ZONES (MASSIVE UPGRADE) ---
+# --- TAB 2: SNIPER SAFE ZONES (Unchanged) ---
 with tab_safezone:
     st.markdown("#### 🎯 Sniper Safe Zones (Math + Structure)")
     st.caption("Calculates Mathematical Expected Move and overlays it against Structural Support/Resistance data.")
@@ -226,48 +325,40 @@ with tab_safezone:
                     math_floor = px - exp_move_dollar
                     math_ceil = px + exp_move_dollar
                     
-                    # 2. PRICE ACTION (Support 1/2, Resistance 1/2)
-                    # S1/R1 = 30-Day Extrems. S2/R2 = 6 Month Extremes.
+                    # 2. PRICE ACTION
                     s1 = hist_1y['Low'].tail(30).min()
                     r1 = hist_1y['High'].tail(30).max()
-                    s2 = hist_1y['Low'].tail(126).min() # 126 trading days = ~6 months
+                    s2 = hist_1y['Low'].tail(126).min() 
                     r2 = hist_1y['High'].tail(126).max()
                     
-                    # 3. VOLUME PROFILE (Point of Control)
+                    # 3. VOLUME PROFILE 
                     hist_6m = hist_1y.tail(126).copy()
                     hist_6m['Price_Bin'] = pd.cut(hist_6m['Close'], bins=30)
                     vol_profile = hist_6m.groupby('Price_Bin', observed=False)['Volume'].sum()
                     poc_interval = vol_profile.idxmax()
                     poc_price = poc_interval.mid
                     
-                    # 4. OPTIONS WALLS (Max Open Interest)
+                    # 4. OPTIONS WALLS 
                     put_wall_str, call_wall_str = "N/A", "N/A"
                     try:
                         avail_exps = yf_tk.options
                         if avail_exps:
-                            # Try to match user's date, or grab the closest weekly
                             target_exp = calc_ex.strftime('%Y-%m-%d')
                             if target_exp not in avail_exps: target_exp = avail_exps[0]
-                            
                             chain = yf_tk.option_chain(target_exp)
-                            
-                            # Filter strikes within a reasonable range (e.g. +/- 30%)
                             puts_filtered = chain.puts[(chain.puts['strike'] >= px * 0.70) & (chain.puts['strike'] <= px)]
                             calls_filtered = chain.calls[(chain.calls['strike'] <= px * 1.30) & (chain.calls['strike'] >= px)]
-                            
                             if not puts_filtered.empty:
                                 put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
                                 put_wall_str = f"${put_wall:.2f}"
                             if not calls_filtered.empty:
                                 call_wall = calls_filtered.loc[calls_filtered['openInterest'].idxmax()]['strike']
                                 call_wall_str = f"${call_wall:.2f}"
-                    except:
-                        pass # Fails gracefully if Yahoo options data is delayed
+                    except: pass 
                     
                     st.write("---")
                     st.markdown(f"### **{calc_tk} X-Ray Analysis | Current Price: ${px:.2f}**")
                     
-                    # DISPLAY THE RAW STATS
                     col_m, col_s1, col_s2, col_s3 = st.columns(4)
                     
                     with col_m:
@@ -303,16 +394,9 @@ with tab_safezone:
                     
                     st.write("---")
                     st.markdown("#### 🎯 Sniper Conclusion")
-                    st.write("Compare the Mathematical Probability against the Structural Reality to find your ultimate strike.")
-                    
-                    # Logic Output
                     out_put, out_call = st.columns(2)
-                    
-                    with out_put:
-                        st.info(f"**🟢 Put Seller (Bullish/Neutral):**\nThe math tells you it is statistically safe down to **${math_floor:.2f}**. However, structural buyers are sitting at S1 (**${s1:.2f}**). \n\n**Pro Move:** Look to sell the strike that is tucked safely underneath both the Math Floor *and* S1.")
-                    
-                    with out_call:
-                        st.error(f"**🔴 Call Seller (Bearish/Neutral):**\nThe math tells you it is statistically safe up to **${math_ceil:.2f}**. However, structural sellers are sitting at R1 (**${r1:.2f}**). \n\n**Pro Move:** Look to sell the strike that is safely above both the Math Ceiling *and* R1.")
+                    with out_put: st.info(f"**🟢 Put Seller (Bullish/Neutral):**\nThe math tells you it is statistically safe down to **${math_floor:.2f}**. However, structural buyers are sitting at S1 (**${s1:.2f}**). \n\n**Pro Move:** Look to sell the strike that is tucked safely underneath both the Math Floor *and* S1.")
+                    with out_call: st.error(f"**🔴 Call Seller (Bearish/Neutral):**\nThe math tells you it is statistically safe up to **${math_ceil:.2f}**. However, structural sellers are sitting at R1 (**${r1:.2f}**). \n\n**Pro Move:** Look to sell the strike that is safely above both the Math Ceiling *and* R1.")
 
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
@@ -373,7 +457,6 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    # Render Data Editor
     edt = st.data_editor(st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), num_rows="dynamic", use_container_width=True, key="ledger_final")
 
 st.markdown(f'<div class="footer-right">Last Synced to GitHub: {st.session_state.last_update}</div>', unsafe_allow_html=True)
