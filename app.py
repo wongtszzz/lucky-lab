@@ -38,17 +38,7 @@ st.markdown("""
     .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
     .creed-text { font-size: 0.95em; line-height: 1.6; }
     
-    /* UNIFIED SUBTLE REGIME BOXES */
-    .regime-box { 
-        background-color: rgba(255, 255, 255, 0.02); 
-        border: 1px solid rgba(128, 128, 128, 0.1); 
-        border-left: 6px solid; 
-        border-radius: 8px; 
-        padding: 20px; 
-        margin-top: 10px; 
-        margin-bottom: 25px; 
-        color: #eee;
-    }
+    .regime-box { background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(128, 128, 128, 0.1); border-left: 6px solid; border-radius: 8px; padding: 20px; margin-top: 10px; margin-bottom: 25px; color: #eee; }
     .regime-title { font-weight: 800; font-size: 1.3em; margin-bottom: 10px; margin-top:0; letter-spacing: 0.5px; }
     .regime-text { font-size: 0.95em; line-height: 1.6; }
     .action-highlight { font-weight: bold; }
@@ -59,8 +49,8 @@ st.markdown("""
     .color-neutral { color: #3a7bd5; border-left-color: #3a7bd5; }
     .color-overbought { color: #8e44ad; border-left-color: #8e44ad; }
     
-    .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; }
-    .sniper-title { font-size: 0.9em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-title { font-size: 0.85em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
     .sniper-value { font-size: 1.8em; font-weight: bold; }
     .put-color { color: #00b09b; }
     .call-color { color: #ff4b4b; }
@@ -68,11 +58,12 @@ st.markdown("""
     
     .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 15px; border-radius: 5px; margin-bottom: 20px;}
     
-    /* NEW TARGET BOX STYLING */
     .target-box-put { background-color: rgba(0, 176, 155, 0.1); border-left: 5px solid #00b09b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
     .target-box-call { background-color: rgba(255, 75, 75, 0.1); border-left: 5px solid #ff4b4b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
     .target-title { font-size: 2.2em; font-weight: 900; margin: 0; }
     .target-sub { margin: 5px 0 0 0; color: #ccc; font-size: 1.1em; }
+    
+    .auto-risk-banner { background-color: rgba(255, 255, 255, 0.05); padding: 10px 15px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); margin-top: 10px; margin-bottom: 10px; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -94,7 +85,6 @@ except Exception as e:
     st.error(f"Secrets Error. Check Streamlit Settings. {e}")
     st.stop()
 
-# --- 2. LOGIC & DATA ENGINE ---
 FILE_PATH = "lucky_ledger.csv"
 COLS = ["Date", "Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
@@ -305,20 +295,21 @@ with tab_macro:
     except Exception as e:
         pass
 
-# --- TAB 2: SNIPER SAFE ZONES (MASSIVE LOGIC & UI UPGRADE) ---
+# --- TAB 2: SNIPER SAFE ZONES (FULLY AUTOMATED RISK ENGINE) ---
 with tab_safezone:
-    st.markdown("#### 🎯 Sniper Safe Zones (Math + Structure)")
-    st.caption("Calculates Mathematical Expected Move and overlays it against Structural Support/Resistance data.")
+    st.markdown("#### 🎯 Sniper Safe Zones (100% Automated)")
+    st.caption("Zero inputs. The app calculates RSI, assigns the perfect Risk Multiplier, and overlays it against Structural data.")
     
+    # Removed the Risk Dial completely. Just Ticker, Expiry, and Calculate.
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
     with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
     with c3:
         st.write(""); st.write("")
-        run_calc = st.button("🔬 Extract Math & Structure", type="primary", use_container_width=True)
+        run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
     
     if run_calc:
-        with st.spinner(f"Running X-Ray data extraction on {calc_tk}..."):
+        with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
             try:
                 yf_tk = yf.Ticker(calc_tk)
                 hist_1y = yf_tk.history(period='1y')
@@ -330,19 +321,75 @@ with tab_safezone:
                     beta = yf_tk.info.get('beta', 1.0) or 1.0
                     days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
                     
-                    # 1. THE MATH
-                    stock_iv_proxy = st.session_state.current_vix * beta
-                    exp_move_pct = (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
-                    exp_move_dollar = px * exp_move_pct
-                    math_floor = px - exp_move_dollar
-                    math_ceil = px + exp_move_dollar
+                    # 0. THE AUTO-RISK ENGINE (Calculate RSI)
+                    try:
+                        delta = hist_1y['Close'].diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        live_rsi = 100 - (100 / (1 + rs.iloc[-1]))
+                        if pd.isna(live_rsi): live_rsi = 50.0
+                    except:
+                        live_rsi = 50.0
                     
-                    # 2. PRICE ACTION (Fixed: Segmented Timeframes)
-                    # S1/R1 = Last 30 Days
+                    # Assign Multipliers based on RSI
+                    if live_rsi < 40:
+                        put_mult, call_mult = 0.5, 1.5
+                        risk_status = f"OVERSOLD (RSI: {live_rsi:.1f}). Auto-Aggressive on Puts (0.5x), Conservative on Calls (1.5x)."
+                    elif live_rsi > 60:
+                        put_mult, call_mult = 1.5, 0.5
+                        risk_status = f"OVERBOUGHT (RSI: {live_rsi:.1f}). Auto-Conservative on Puts (1.5x), Aggressive on Calls (0.5x)."
+                    else:
+                        put_mult, call_mult = 1.0, 1.0
+                        risk_status = f"NEUTRAL (RSI: {live_rsi:.1f}). Balanced Risk Applied (1.0x move)."
+
+                    st.markdown(f"<div class='auto-risk-banner'>🤖 <b>Auto-Risk Engine Active:</b> {risk_status}</div>", unsafe_allow_html=True)
+                    
+                    put_wall_str, call_wall_str = "N/A", "N/A"
+                    put_wall, call_wall = None, None
+                    base_exp_move = 0.0
+                    math_type_str = "Theoretical IV"
+                    
+                    # 1. SMART MATH: Attempt to get Market Maker ATM Straddle
+                    try:
+                        avail_exps = yf_tk.options
+                        if avail_exps:
+                            target_exp = calc_ex.strftime('%Y-%m-%d')
+                            if target_exp not in avail_exps: target_exp = avail_exps[0]
+                            chain = yf_tk.option_chain(target_exp)
+                            
+                            # Find ATM Straddle Cost
+                            closest_call = chain.calls.iloc[(chain.calls['strike'] - px).abs().argsort()[:1]]
+                            closest_put = chain.puts.iloc[(chain.puts['strike'] - px).abs().argsort()[:1]]
+                            
+                            c_price = closest_call['lastPrice'].values[0]
+                            p_price = closest_put['lastPrice'].values[0]
+                            base_exp_move = float(c_price + p_price)
+                            math_type_str = "Market Maker Straddle"
+                            
+                            # Options Walls
+                            puts_filtered = chain.puts[(chain.puts['strike'] >= px * 0.70) & (chain.puts['strike'] <= px)]
+                            calls_filtered = chain.calls[(chain.calls['strike'] <= px * 1.30) & (chain.calls['strike'] >= px)]
+                            if not puts_filtered.empty:
+                                put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
+                                put_wall_str = f"${put_wall:.2f}"
+                            if not calls_filtered.empty:
+                                call_wall = calls_filtered.loc[calls_filtered['openInterest'].idxmax()]['strike']
+                                call_wall_str = f"${call_wall:.2f}"
+                    except: pass 
+                    
+                    # Fallback to theoretical math if options chain pull failed or move is 0
+                    if base_exp_move <= 0:
+                        stock_iv_proxy = st.session_state.current_vix * beta
+                        base_exp_move = px * (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
+                    
+                    # Apply Auto-Multipliers
+                    math_floor = px - (base_exp_move * put_mult)
+                    math_ceil = px + (base_exp_move * call_mult)
+                    
+                    # 2. PRICE ACTION
                     s1 = hist_1y['Low'].tail(30).min()
                     r1 = hist_1y['High'].tail(30).max()
-                    
-                    # S2/R2 = Older Macro Data (6 months ago up to 30 days ago)
                     older_data = hist_1y.iloc[-126:-30]
                     s2 = older_data['Low'].min() if not older_data.empty else s1
                     r2 = older_data['High'].max() if not older_data.empty else r1
@@ -354,32 +401,11 @@ with tab_safezone:
                     poc_interval = vol_profile.idxmax()
                     poc_price = poc_interval.mid
                     
-                    # 4. OPTIONS WALLS 
-                    put_wall_str, call_wall_str = "N/A", "N/A"
-                    put_wall, call_wall = None, None
-                    try:
-                        avail_exps = yf_tk.options
-                        if avail_exps:
-                            target_exp = calc_ex.strftime('%Y-%m-%d')
-                            if target_exp not in avail_exps: target_exp = avail_exps[0]
-                            chain = yf_tk.option_chain(target_exp)
-                            puts_filtered = chain.puts[(chain.puts['strike'] >= px * 0.70) & (chain.puts['strike'] <= px)]
-                            calls_filtered = chain.calls[(chain.calls['strike'] <= px * 1.30) & (chain.calls['strike'] >= px)]
-                            if not puts_filtered.empty:
-                                put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
-                                put_wall_str = f"${put_wall:.2f}"
-                            if not calls_filtered.empty:
-                                call_wall = calls_filtered.loc[calls_filtered['openInterest'].idxmax()]['strike']
-                                call_wall_str = f"${call_wall:.2f}"
-                    except: pass 
-                    
                     # CALCULATE THE ULTIMATE SNIPER STRIKES
-                    # Safest Put is the lowest number between the Math and Structural Support S1.
                     target_put = min(math_floor, s1)
                     if put_wall is not None and put_wall < px:
                         target_put = min(target_put, put_wall)
                         
-                    # Safest Call is the highest number between Math and Resistance R1.
                     target_call = max(math_ceil, r1)
                     if call_wall is not None and call_wall > px:
                         target_call = max(target_call, call_wall)
@@ -391,10 +417,10 @@ with tab_safezone:
                     
                     with col_m:
                         st.markdown(f"""<div class="sniper-box">
-                            <div class="sniper-title">1. The Math (68% Move)</div>
+                            <div class="sniper-title">1. Auto-Math Move</div>
                             <div class="sniper-value put-color">Floor: ${math_floor:.2f}</div>
                             <div class="sniper-value call-color">Ceiling: ${math_ceil:.2f}</div>
-                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Based on IV & Time</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Base: {math_type_str}</div>
                             </div>""", unsafe_allow_html=True)
                             
                     with col_s1:
@@ -423,18 +449,17 @@ with tab_safezone:
                     st.write("---")
                     st.markdown("#### 🎯 Ultimate Target Strikes")
                     
-                    # DIRECT NUMBER OUTPUT (Vertically Stacked to prevent overlapping)
                     st.markdown(f"""
                     <div class="target-box-put">
                         <div class="target-title" style="color: #00b09b;">🟢 TARGET PUT STRIKE: ${target_put:.2f} (or lower)</div>
-                        <div class="target-sub">Safest mathematical floor. Dynamically tucked beneath the Math probability (${math_floor:.2f}), Structural S1 (${s1:.2f}), and Options Wall ({put_wall_str}).</div>
+                        <div class="target-sub">Safest combination of Auto-Math (${math_floor:.2f}), Structural S1 (${s1:.2f}), and Options Wall ({put_wall_str}).</div>
                     </div>
                     """, unsafe_allow_html=True)
 
                     st.markdown(f"""
                     <div class="target-box-call">
                         <div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL STRIKE: ${target_call:.2f} (or higher)</div>
-                        <div class="target-sub">Safest mathematical ceiling. Dynamically placed above the Math probability (${math_ceil:.2f}), Structural R1 (${r1:.2f}), and Options Wall ({call_wall_str}).</div>
+                        <div class="target-sub">Safest combination of Auto-Math (${math_ceil:.2f}), Structural R1 (${r1:.2f}), and Options Wall ({call_wall_str}).</div>
                     </div>
                     """, unsafe_allow_html=True)
 
