@@ -131,153 +131,164 @@ if 'current_vix' not in st.session_state:
 
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
-# --- 3. UI TABS ---
-tab1, tab_screener, tab2 = st.tabs(["🌍 Macro & Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
+# --- 3. UI TABS (NOW 4 DEDICATED TABS) ---
+tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🛡️ Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO & SAFE ZONE COMBINED ---
-with tab1:
-    col_macro, col_calc = st.columns([1.2, 1], gap="large")
+# --- TAB 1: MACRO PLAYBOOK ---
+with tab_macro:
+    head_col, btn_col = st.columns([5, 1])
+    with head_col: 
+        st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
+        st.caption("Live diagnosis of market conditions. Hover over metrics for your logic reminders.")
+    with btn_col: 
+        st.button("🔄 Refresh Data", use_container_width=True)
     
-    # --- LEFT SIDE: MACRO MATRIX ---
-    with col_macro:
-        head_col, btn_col = st.columns([4, 1])
-        with head_col: 
-            st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
-        with btn_col: 
-            st.button("🔄 Refresh", use_container_width=True)
-            
-        st.caption("Hover over metrics for your logic reminders.")
+    st.write("---")
+    
+    try:
+        def get_macro_live(symbol):
+            t = yf.Ticker(symbol)
+            df = t.history(period='5d')
+            if len(df) >= 2:
+                prev = float(df['Close'].iloc[-2])
+                curr = float(df['Close'].iloc[-1])
+                return curr, ((curr - prev) / prev) * 100
+            return 0.0, 0.0
         
-        try:
-            def get_macro_live(symbol):
-                t = yf.Ticker(symbol)
-                df = t.history(period='5d')
-                if len(df) >= 2:
-                    prev = float(df['Close'].iloc[-2])
-                    curr = float(df['Close'].iloc[-1])
-                    return curr, ((curr - prev) / prev) * 100
-                return 0.0, 0.0
-            
-            # Pull Live Data
-            oil_px, oil_pct = get_macro_live("CL=F")      # WTI Crude
-            dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")  # US Dollar Index
-            vix_px, vix_pct = get_macro_live("^VIX")      # Volatility Index
-            
-            st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
-            
-            # Determine Statuses for Display
-            oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 90 else "🔴 Spiking")
-            dxy_status = "🟢 Weak (Dovish)" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 106 else "🔴 Strong (Hawkish)")
-            vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
-
-            # The 3-Pillar Grid
-            m1, m2, m3 = st.columns(3)
-            
-            m1.metric(
-                label="🛢️ WTI Crude Oil", 
-                value=f"${oil_px:,.2f}", 
-                delta=f"{oil_status} ({oil_pct:+.2f}%)", 
-                delta_color="inverse" if oil_px > 80 else "normal",
-                help="Crude Oil (WTI): The Cost of Everything. If oil spikes, inflation spikes. If inflation spikes, the Federal Reserve can't cut interest rates. High rates crush growth stocks."
-            )
-            
-            m2.metric(
-                label="💵 US Dollar (DXY)", 
-                value=f"{dxy_px:,.2f}", 
-                delta=f"{dxy_status} ({dxy_pct:+.2f}%)", 
-                delta_color="inverse" if dxy_px > 106 else "normal",
-                help="DXY: Global Liquidity. A strong dollar means funding is tight and expensive, hurting risk assets. A weak dollar means liquidity is flooding the system, pushing equities higher."
-            )
-            
-            m3.metric(
-                label="📉 Volatility (VIX)", 
-                value=f"{vix_px:,.2f}", 
-                delta=f"{vix_status} ({vix_pct:+.2f}%)", 
-                delta_color="inverse" if vix_px > 25 else "normal",
-                help="VIX: Market Fear. Measures the expected volatility over the next 30 days. Spikes indicate panic and expensive option premiums; low numbers indicate complacency."
-            )
-
-            # --- THE MACRO REGIME ENGINE ---
-            if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
-                st.markdown("""
-                <div class="regime-box" style="background: linear-gradient(135deg, #b91d47 0%, #800000 100%);">
-                    <h3 style="color: white; margin-top: 0;">🚨 CRASHING / SQUEEZE</h3>
-                    <p style="font-size: 1.0em; margin-bottom: 0;">
-                    <b>Strategy:</b> HOLD CASH. Do not catch falling knives. Selling puts here is dangerous. Wait for the VIX to crush below 25.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
-                st.markdown("""
-                <div class="regime-box" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">
-                    <h3 style="color: white; margin-top: 0;">⚠️ BEARISH / CORRECTION</h3>
-                    <p style="font-size: 1.0em; margin-bottom: 0;">
-                    <b>Strategy:</b> Rotate defensive. Look to Traditional/Energy stocks. Sell Covered Calls on existing positions. Keep collateral free.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
-                st.markdown("""
-                <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
-                    <h3 style="color: white; margin-top: 0;">🚀 BULLISH / RISK-ON</h3>
-                    <p style="font-size: 1.0em; margin-bottom: 0;">
-                    <b>Strategy:</b> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            else:
-                st.markdown("""
-                <div class="regime-box" style="background: linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);">
-                    <h3 style="color: white; margin-top: 0;">⚖️ NEUTRAL / RANGE-BOUND</h3>
-                    <p style="font-size: 1.0em; margin-bottom: 0;">
-                    <b>Strategy:</b> Stock picker's market. Keep trade durations short (weeklies) and collect Theta decay on range-bound tickers.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error(f"Error fetching macro data: {e}")
-
-    # --- RIGHT SIDE: SAFE ZONE CALCULATOR ---
-    with col_calc:
-        st.markdown("#### 🛡️ Safe Zone Calculator")
-        st.caption("Instantly calculates your mathematical floor and ceiling for any ticker.")
+        # Pull Live Data
+        oil_px, oil_pct = get_macro_live("CL=F")      # WTI Crude
+        dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")  # US Dollar Index
+        vix_px, vix_pct = get_macro_live("^VIX")      # Volatility Index
         
-        c1, c2 = st.columns(2)
-        calc_tk = c1.text_input("Ticker", value="TSLA", key="calc_tk").upper()
-        calc_ex = c2.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
+        st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
         
-        if st.button("🧮 Calculate Safe Zones", type="primary", use_container_width=True):
-            with st.spinner(f"Crunching quant math for {calc_tk}..."):
-                try:
-                    yf_tk = yf.Ticker(calc_tk)
-                    hist_df = yf_tk.history(period='5d')
-                    if hist_df.empty:
-                        st.error("Invalid Ticker or No Data Found.")
-                    else:
-                        px = float(hist_df['Close'].iloc[-1])
-                        beta = yf_tk.info.get('beta', 1.0) or 1.0
-                        days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
-                        
-                        stock_iv_proxy = st.session_state.current_vix * beta
-                        exp_move_pct = (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
-                        exp_move_dollar = px * exp_move_pct
-                        
-                        st.markdown(f"### **{calc_tk} Current Price: ${px:.2f}**")
-                        st.write(f"**Beta:** {beta:.2f} | **Timeframe:** {days_to_exp} Days | **Expected Swing:** ± {exp_move_pct*100:.1f}% (± ${exp_move_dollar:.2f})")
-                        
-                        t1, t2 = st.columns(2)
-                        with t1: 
-                            st.info(f"🟢 **SAFE PUT FLOOR**\n# **${px - exp_move_dollar:.2f}**\n*Do not sell puts above this.*")
-                        with t2: 
-                            st.error(f"🔴 **SAFE CALL CEILING**\n# **${px + exp_move_dollar:.2f}**\n*Do not sell calls below this.*")
-                except Exception as e:
-                    st.error(f"Calculation Error: {e}")
+        # Determine Statuses for Display
+        oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 90 else "🔴 Spiking")
+        dxy_status = "🟢 Weak (Dovish)" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 106 else "🔴 Strong (Hawkish)")
+        vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
 
-# --- TAB 2: THE OPPORTUNITY SCREENER (VRP Edge) ---
+        # The 3-Pillar Grid
+        m1, m2, m3 = st.columns(3)
+        
+        m1.metric(
+            label="🛢️ WTI Crude Oil", 
+            value=f"${oil_px:,.2f}", 
+            delta=f"{oil_status} ({oil_pct:+.2f}%)", 
+            delta_color="inverse" if oil_px > 80 else "normal",
+            help="Crude Oil (WTI): The Cost of Everything. If oil spikes, inflation spikes. If inflation spikes, the Federal Reserve can't cut interest rates. High rates crush growth stocks."
+        )
+        
+        m2.metric(
+            label="💵 US Dollar (DXY)", 
+            value=f"{dxy_px:,.2f}", 
+            delta=f"{dxy_status} ({dxy_pct:+.2f}%)", 
+            delta_color="inverse" if dxy_px > 106 else "normal",
+            help="DXY: Global Liquidity. A strong dollar means funding is tight and expensive, hurting risk assets. A weak dollar means liquidity is flooding the system, pushing equities higher."
+        )
+        
+        m3.metric(
+            label="📉 Volatility (VIX)", 
+            value=f"{vix_px:,.2f}", 
+            delta=f"{vix_status} ({vix_pct:+.2f}%)", 
+            delta_color="inverse" if vix_px > 25 else "normal",
+            help="VIX: Market Fear. Measures the expected volatility over the next 30 days. Spikes indicate panic and expensive option premiums; low numbers indicate complacency."
+        )
+
+        st.write("---")
+        st.markdown("#### 📖 Daily Strategy Playbook")
+        
+        # --- THE MACRO REGIME ENGINE ---
+        if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #b91d47 0%, #800000 100%);">
+                <h3 style="color: white; margin-top: 0;">🚨 CRASHING / LIQUIDITY SQUEEZE</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>Strategy:</b> HOLD CASH. Do not catch falling knives. Selling puts here is dangerous as support levels will fail. Wait for the VIX to crush back down below 25 before deploying new capital.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">
+                <h3 style="color: white; margin-top: 0;">⚠️ BEARISH / CORRECTION MODE</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>Strategy:</b> Rotate defensive. Look to Traditional and Energy stocks. Focus on selling Covered Calls on existing positions rather than selling new puts. Keep collateral free.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
+                <h3 style="color: white; margin-top: 0;">🚀 EXTREME BULLISH / RISK-ON</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>Strategy:</b> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist (NVDA, TSLA, etc.). Ride the liquidity wave, but be mindful of sudden pullbacks.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        else:
+            st.markdown("""
+            <div class="regime-box" style="background: linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);">
+                <h3 style="color: white; margin-top: 0;">⚖️ NEUTRAL / RANGE-BOUND</h3>
+                <p style="font-size: 1.1em; margin-bottom: 0;">
+                <b>Strategy:</b> Stock picker's market. Use your Screener to find specific exhausted stocks. Keep trade durations short (weeklies) and collect Theta decay on range-bound tickers.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"Error fetching macro data: {e}")
+
+# --- TAB 2: SAFE ZONES ---
+with tab_safezone:
+    st.markdown("#### 🛡️ Safe Zone Calculator")
+    st.caption("Instantly calculates your mathematical floor and ceiling for any ticker.")
+    
+    c1, c2, c3 = st.columns([1, 1, 2])
+    
+    with c1:
+        calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk").upper()
+    with c2:
+        calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
+    with c3:
+        # Pushing the button down to align with inputs
+        st.write("")
+        st.write("")
+        run_calc = st.button("🧮 Calculate Safe Zones", type="primary", use_container_width=True)
+    
+    if run_calc:
+        with st.spinner(f"Crunching quant math for {calc_tk}..."):
+            try:
+                yf_tk = yf.Ticker(calc_tk)
+                hist_df = yf_tk.history(period='5d')
+                if hist_df.empty:
+                    st.error("Invalid Ticker or No Data Found.")
+                else:
+                    px = float(hist_df['Close'].iloc[-1])
+                    beta = yf_tk.info.get('beta', 1.0) or 1.0
+                    days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
+                    
+                    stock_iv_proxy = st.session_state.current_vix * beta
+                    exp_move_pct = (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
+                    exp_move_dollar = px * exp_move_pct
+                    
+                    st.write("---")
+                    st.markdown(f"### **{calc_tk} Current Price: ${px:.2f}**")
+                    st.write(f"**Beta:** {beta:.2f} | **Timeframe:** {days_to_exp} Days | **Expected Swing:** ± {exp_move_pct*100:.1f}% (± ${exp_move_dollar:.2f})")
+                    
+                    st.write("")
+                    
+                    t1, t2 = st.columns(2)
+                    with t1: 
+                        st.info(f"🟢 **SAFE PUT FLOOR**\n# **${px - exp_move_dollar:.2f}**\n*Do not sell puts above this.*")
+                    with t2: 
+                        st.error(f"🔴 **SAFE CALL CEILING**\n# **${px + exp_move_dollar:.2f}**\n*Do not sell calls below this.*")
+            except Exception as e:
+                st.error(f"Calculation Error: {e}")
+
+# --- TAB 3: THE OPPORTUNITY SCREENER (VRP Edge) ---
 with tab_screener:
     st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
     st.caption(f"Scanning the {len(WATCHLIST)} most liquid tickers for over-priced option premiums.")
@@ -350,12 +361,12 @@ with tab_screener:
                     "VRP Edge (Your Profit)": "+{:.1f}%"
                 })
                 st.dataframe(display_df, use_container_width=True, hide_index=True)
-                st.info("👉 **Next Step:** Take the tickers at the top and plug them into your Safe Zone Calculator on Tab 1!")
+                st.info("👉 **Next Step:** Take the tickers at the top and plug them into your Safe Zone Calculator on Tab 2!")
             else:
                 st.warning("No stocks currently have a high enough VRP Edge. The market might be pricing options too accurately right now.")
 
-# --- TAB 3: LEDGER ---
-with tab2:
+# --- TAB 4: LEDGER ---
+with tab_ledger:
     st.markdown("""
     <div class="creed-box">
         <div class="creed-title">🧠 The Quants Creed</div>
@@ -431,7 +442,7 @@ with tab2:
 
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
-        num_rows="dynamic", use_container_width=True, key="ledger_editor_final5",
+        num_rows="dynamic", use_container_width=True, key="ledger_editor_final6",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
