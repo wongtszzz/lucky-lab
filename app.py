@@ -123,7 +123,7 @@ WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NF
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🎯 Sniper Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO PLAYBOOK (SYNCHRONIZED LOGIC) ---
+# --- TAB 1: MACRO PLAYBOOK (Unchanged) ---
 with tab_macro:
     head_col, btn_col = st.columns([5, 1])
     with head_col: 
@@ -184,20 +184,18 @@ with tab_macro:
         
         st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
         b1, b2 = st.columns(2)
-        
         b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
         b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
 
         st.write("---")
         
-        # 3. LIVE AI SYNTHESIS ENGINE (Synchronized to 80/20 Thresholds)
+        # 3. LIVE AI SYNTHESIS ENGINE
         st.markdown("#### 🧠 Live Market Synthesis")
         
         syn_oil = "Energy prices are running hot, putting upward pressure on inflation and acting as a headwind for rate cuts." if oil_px > 85 else "Crude oil remains contained, alleviating inflation fears and supporting risk assets."
         syn_dxy = "The US Dollar is showing strength, tightening global liquidity and pressuring multinational tech earnings." if dxy_px > 105 else "A weaker dollar is currently providing a highly favorable liquidity environment for equities."
         syn_vix = "However, the VIX is elevated, indicating institutional funds are actively buying downside protection. Fear is present in the order book." if vix_px > 25 else "Volatility is crushed, showing market complacency and a clear 'risk-on' environment."
         
-        # Ironclad Breadth + VIX Logic Sync
         if breadth_avg >= 80: 
             syn_brd = "Under the hood, participation is exceptionally strong (Overbought). The rally is mathematically exhausted and highly vulnerable to a sudden pullback."
         elif breadth_avg <= 20: 
@@ -215,10 +213,9 @@ with tab_macro:
         </div>
         """, unsafe_allow_html=True)
 
-        # 4. THE PLAYBOOK REGIME (Synchronized to 80/20 Thresholds)
+        # 4. THE PLAYBOOK REGIME
         st.markdown("#### 📖 Actionable Strategy Playbook")
         
-        # Priority 1: Crash/Panic
         if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
             st.markdown("""
             <div class="regime-box" style="background: linear-gradient(135deg, #b91d47 0%, #800000 100%);">
@@ -230,7 +227,6 @@ with tab_macro:
             </div>
             """, unsafe_allow_html=True)
             
-        # Priority 2: Safe Oversold Opportunity
         elif breadth_avg <= 20 and vix_px <= 25:
              st.markdown("""
             <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #008080 100%);">
@@ -242,7 +238,6 @@ with tab_macro:
             </div>
             """, unsafe_allow_html=True)           
 
-        # Priority 3: Bearish Macro
         elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
             st.markdown("""
             <div class="regime-box" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">
@@ -254,7 +249,6 @@ with tab_macro:
             </div>
             """, unsafe_allow_html=True)
             
-        # Priority 4: Overbought Warning
         elif breadth_avg >= 80:
              st.markdown("""
             <div class="regime-box" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);">
@@ -266,7 +260,6 @@ with tab_macro:
             </div>
             """, unsafe_allow_html=True)           
             
-        # Priority 5: Perfect Bull Market
         elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
             st.markdown("""
             <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
@@ -278,7 +271,6 @@ with tab_macro:
             </div>
             """, unsafe_allow_html=True)
             
-        # Default: Chop
         else:
             st.markdown("""
             <div class="regime-box" style="background: linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);">
@@ -293,7 +285,7 @@ with tab_macro:
     except Exception as e:
         pass
 
-# --- TAB 2: SNIPER SAFE ZONES (Unchanged) ---
+# --- TAB 2: SNIPER SAFE ZONES (BUG FIXED: Using f-strings) ---
 with tab_safezone:
     st.markdown("#### 🎯 Sniper Safe Zones (Math + Structure)")
     st.caption("Calculates Mathematical Expected Move and overlays it against Structural Support/Resistance data.")
@@ -361,36 +353,37 @@ with tab_safezone:
                     
                     col_m, col_s1, col_s2, col_s3 = st.columns(4)
                     
+                    # PRO FIX: Converted all of these to f-strings to prevent the '%' crash!
                     with col_m:
-                        st.markdown("""<div class="sniper-box">
+                        st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">1. The Math (68% Move)</div>
-                            <div class="sniper-value put-color">Floor: $%.2f</div>
-                            <div class="sniper-value call-color">Ceiling: $%.2f</div>
+                            <div class="sniper-value put-color">Floor: ${math_floor:.2f}</div>
+                            <div class="sniper-value call-color">Ceiling: ${math_ceil:.2f}</div>
                             <div style="font-size:0.8em; color:gray; margin-top:5px;">Based on IV & Time</div>
-                            </div>""" % (math_floor, math_ceil), unsafe_allow_html=True)
+                            </div>""", unsafe_allow_html=True)
                             
                     with col_s1:
-                        st.markdown("""<div class="sniper-box">
+                        st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">2. Price Action</div>
-                            <div style="color:#00b09b;"><b>S1:</b> $%.2f <br><b>S2:</b> $%.2f</div>
-                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1:</b> $%.2f <br><b>R2:</b> $%.2f</div>
+                            <div style="color:#00b09b;"><b>S1:</b> ${s1:.2f} <br><b>S2:</b> ${s2:.2f}</div>
+                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1:</b> ${r1:.2f} <br><b>R2:</b> ${r2:.2f}</div>
                             <div style="font-size:0.8em; color:gray; margin-top:5px;">Historical Bounces</div>
-                            </div>""" % (s1, s2, r1, r2), unsafe_allow_html=True)
+                            </div>""", unsafe_allow_html=True)
                             
                     with col_s2:
-                        st.markdown("""<div class="sniper-box">
+                        st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">3. Volume Profile</div>
-                            <div class="sniper-value neutral-color">POC: $%.2f</div>
+                            <div class="sniper-value neutral-color">POC: ${poc_price:.2f}</div>
                             <div style="font-size:0.8em; color:gray; margin-top:10px;">6-Mo Max Volume Node</div>
-                            </div>""" % (poc_price), unsafe_allow_html=True)
+                            </div>""", unsafe_allow_html=True)
                             
                     with col_s3:
-                        st.markdown("""<div class="sniper-box">
+                        st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">4. Options Walls</div>
-                            <div style="color:#00b09b; font-size:1.2em;"><b>Put Wall:</b> %s</div>
-                            <div style="color:#ff4b4b; font-size:1.2em; margin-top:5px;"><b>Call Wall:</b> %s</div>
+                            <div style="color:#00b09b; font-size:1.2em;"><b>Put Wall:</b> {put_wall_str}</div>
+                            <div style="color:#ff4b4b; font-size:1.2em; margin-top:5px;"><b>Call Wall:</b> {call_wall_str}</div>
                             <div style="font-size:0.8em; color:gray; margin-top:5px;">Max Open Interest</div>
-                            </div>""" % (put_wall_str, call_wall_str), unsafe_allow_html=True)
+                            </div>""", unsafe_allow_html=True)
                     
                     st.write("---")
                     st.markdown("#### 🎯 Sniper Conclusion")
