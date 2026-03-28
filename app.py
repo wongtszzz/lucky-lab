@@ -222,11 +222,9 @@ with tab_macro:
             except:
                 return 50.0, 0, len(ticker_list)
                 
-        # Calculate Both Breadth Indices
         s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
         nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
         
-        # Display the metrics side-by-side
         b1, b2 = st.columns(2)
         b1.metric(
             label="S&P 500 Breadth (S5TW Proxy)", 
@@ -241,13 +239,17 @@ with tab_macro:
             delta_color="normal" if nctw_pct >= 50 else "inverse"
         )
         
-        # Average the two for a comprehensive market health score
         breadth_avg = (s5tw_pct + nctw_pct) / 2
         
+        # --- FIXED CONTEXT-AWARE BREADTH LOGIC ---
         if breadth_avg >= 80:
             st.error(f"🔥 OVERBOUGHT: The rally is exhausted across both indices. Selling calls is mathematically safer here.")
         elif breadth_avg <= 20:
-            st.success(f"🧊 OVERSOLD: The market is completely washed out. Blood is in the streets. This is the optimal time to sell Puts on high-quality tech.")
+            # Check VIX before recommending selling puts!
+            if vix_px > 30:
+                st.warning(f"⚠️ CAPITULATION: The market is washed out, BUT the VIX is in pure panic mode. Do NOT sell puts yet. This is a falling knife. Wait for VIX to drop below 25.")
+            else:
+                st.success(f"🧊 OVERSOLD: The market is washed out and fear is contained. This is the optimal time to sell Puts on high-quality tech.")
         else:
             st.info(f"⚖️ NEUTRAL: The market has healthy, mixed participation. Proceed with standard macro strategies.")
 
@@ -493,7 +495,7 @@ with tab_ledger:
 
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
-        num_rows="dynamic", use_container_width=True, key="ledger_editor_final9",
+        num_rows="dynamic", use_container_width=True, key="ledger_editor_final10",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
