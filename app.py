@@ -44,6 +44,14 @@ st.markdown("""
     }
     .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
     .creed-text { font-size: 0.95em; line-height: 1.6; }
+    
+    .regime-box {
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 10px;
+        margin-bottom: 25px;
+        color: white;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,25 +129,27 @@ if 'journal' not in st.session_state:
 if 'current_vix' not in st.session_state:
     st.session_state.current_vix = 20.0
 
-# Watchlist for the Screener
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
 # --- 3. UI TABS ---
-tab1, tab_screener, tab2 = st.tabs(["⚡ Macro & Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
+tab1, tab_screener, tab2 = st.tabs(["🌍 Macro & Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO & IDEA GENERATION ---
+# --- TAB 1: MACRO & SAFE ZONE COMBINED ---
 with tab1:
-    col_market, col_calc = st.columns(2, gap="large")
+    col_macro, col_calc = st.columns([1.2, 1], gap="large")
     
-    with col_market:
-        head_col, btn_col = st.columns([3, 1])
-        with head_col: st.markdown("#### 🌍 Market Temperature")
-        with btn_col: st.button("🔄 Refresh", use_container_width=True)
+    # --- LEFT SIDE: MACRO MATRIX ---
+    with col_macro:
+        head_col, btn_col = st.columns([4, 1])
+        with head_col: 
+            st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
+        with btn_col: 
+            st.button("🔄 Refresh", use_container_width=True)
             
-        st.caption("Live baseline metrics for the broader market.")
+        st.caption("Hover over metrics for your logic reminders.")
         
         try:
-            def get_yf_metrics(symbol):
+            def get_macro_live(symbol):
                 t = yf.Ticker(symbol)
                 df = t.history(period='5d')
                 if len(df) >= 2:
@@ -148,25 +158,90 @@ with tab1:
                     return curr, ((curr - prev) / prev) * 100
                 return 0.0, 0.0
             
-            spy_px, spy_pct = get_yf_metrics("SPY")
-            qqq_px, qqq_pct = get_yf_metrics("QQQ")
-            vix_px, vix_pct = get_yf_metrics("^VIX")
+            # Pull Live Data
+            oil_px, oil_pct = get_macro_live("CL=F")      # WTI Crude
+            dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")  # US Dollar Index
+            vix_px, vix_pct = get_macro_live("^VIX")      # Volatility Index
             
             st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
             
-            m1, m2 = st.columns(2)
-            m1.metric("S&P 500", f"${spy_px:,.2f}", f"{spy_pct:+.2f}%")
-            m2.metric("Nasdaq", f"${qqq_px:,.2f}", f"{qqq_pct:+.2f}%")
+            # Determine Statuses for Display
+            oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 90 else "🔴 Spiking")
+            dxy_status = "🟢 Weak (Dovish)" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 106 else "🔴 Strong (Hawkish)")
+            vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
+
+            # The 3-Pillar Grid
+            m1, m2, m3 = st.columns(3)
             
-            market_daily_expected_pct = st.session_state.current_vix / np.sqrt(252)
+            m1.metric(
+                label="🛢️ WTI Crude Oil", 
+                value=f"${oil_px:,.2f}", 
+                delta=f"{oil_status} ({oil_pct:+.2f}%)", 
+                delta_color="inverse" if oil_px > 80 else "normal",
+                help="Crude Oil (WTI): The Cost of Everything. If oil spikes, inflation spikes. If inflation spikes, the Federal Reserve can't cut interest rates. High rates crush growth stocks."
+            )
             
-            m3, m4 = st.columns(2)
-            m3.metric("Volatility (VIX)", f"{vix_px:,.2f}", f"{vix_pct:+.2f}%", delta_color="inverse")
-            m4.metric("SPY 1-Day Exp. Move", f"± {market_daily_expected_pct:.2f}%", "Rule of 16 Baseline", delta_color="off")
+            m2.metric(
+                label="💵 US Dollar (DXY)", 
+                value=f"{dxy_px:,.2f}", 
+                delta=f"{dxy_status} ({dxy_pct:+.2f}%)", 
+                delta_color="inverse" if dxy_px > 106 else "normal",
+                help="DXY: Global Liquidity. A strong dollar means funding is tight and expensive, hurting risk assets. A weak dollar means liquidity is flooding the system, pushing equities higher."
+            )
+            
+            m3.metric(
+                label="📉 Volatility (VIX)", 
+                value=f"{vix_px:,.2f}", 
+                delta=f"{vix_status} ({vix_pct:+.2f}%)", 
+                delta_color="inverse" if vix_px > 25 else "normal",
+                help="VIX: Market Fear. Measures the expected volatility over the next 30 days. Spikes indicate panic and expensive option premiums; low numbers indicate complacency."
+            )
+
+            # --- THE MACRO REGIME ENGINE ---
+            if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
+                st.markdown("""
+                <div class="regime-box" style="background: linear-gradient(135deg, #b91d47 0%, #800000 100%);">
+                    <h3 style="color: white; margin-top: 0;">🚨 CRASHING / SQUEEZE</h3>
+                    <p style="font-size: 1.0em; margin-bottom: 0;">
+                    <b>Strategy:</b> HOLD CASH. Do not catch falling knives. Selling puts here is dangerous. Wait for the VIX to crush below 25.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
+                st.markdown("""
+                <div class="regime-box" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);">
+                    <h3 style="color: white; margin-top: 0;">⚠️ BEARISH / CORRECTION</h3>
+                    <p style="font-size: 1.0em; margin-bottom: 0;">
+                    <b>Strategy:</b> Rotate defensive. Look to Traditional/Energy stocks. Sell Covered Calls on existing positions. Keep collateral free.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
+                st.markdown("""
+                <div class="regime-box" style="background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);">
+                    <h3 style="color: white; margin-top: 0;">🚀 BULLISH / RISK-ON</h3>
+                    <p style="font-size: 1.0em; margin-bottom: 0;">
+                    <b>Strategy:</b> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            else:
+                st.markdown("""
+                <div class="regime-box" style="background: linear-gradient(135deg, #3a7bd5 0%, #3a6073 100%);">
+                    <h3 style="color: white; margin-top: 0;">⚖️ NEUTRAL / RANGE-BOUND</h3>
+                    <p style="font-size: 1.0em; margin-bottom: 0;">
+                    <b>Strategy:</b> Stock picker's market. Keep trade durations short (weeklies) and collect Theta decay on range-bound tickers.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
 
         except Exception as e:
-            st.error(f"Error fetching market data: {e}")
+            st.error(f"Error fetching macro data: {e}")
 
+    # --- RIGHT SIDE: SAFE ZONE CALCULATOR ---
     with col_calc:
         st.markdown("#### 🛡️ Safe Zone Calculator")
         st.caption("Instantly calculates your mathematical floor and ceiling for any ticker.")
@@ -195,12 +270,14 @@ with tab1:
                         st.write(f"**Beta:** {beta:.2f} | **Timeframe:** {days_to_exp} Days | **Expected Swing:** ± {exp_move_pct*100:.1f}% (± ${exp_move_dollar:.2f})")
                         
                         t1, t2 = st.columns(2)
-                        with t1: st.info(f"🟢 **SAFE PUT FLOOR**\n# **${px - exp_move_dollar:.2f}**\n*Do not sell puts above this.*")
-                        with t2: st.error(f"🔴 **SAFE CALL CEILING**\n# **${px + exp_move_dollar:.2f}**\n*Do not sell calls below this.*")
+                        with t1: 
+                            st.info(f"🟢 **SAFE PUT FLOOR**\n# **${px - exp_move_dollar:.2f}**\n*Do not sell puts above this.*")
+                        with t2: 
+                            st.error(f"🔴 **SAFE CALL CEILING**\n# **${px + exp_move_dollar:.2f}**\n*Do not sell calls below this.*")
                 except Exception as e:
                     st.error(f"Calculation Error: {e}")
 
-# --- TAB 2: THE OPPORTUNITY SCREENER (UPGRADED WITH VRP) ---
+# --- TAB 2: THE OPPORTUNITY SCREENER (VRP Edge) ---
 with tab_screener:
     st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
     st.caption(f"Scanning the {len(WATCHLIST)} most liquid tickers for over-priced option premiums.")
@@ -209,7 +286,6 @@ with tab_screener:
     with col_filt1:
         strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
     with col_filt2:
-        # Replaced Min Volatility with Minimum VRP Edge
         min_edge = st.slider("Minimum VRP Edge (+%)", min_value=0, max_value=25, value=5, step=1, help="The difference between the market's fear (Implied Volatility) and actual reality (Historical Volatility). Higher edge = Overpriced Options!")
         
     if st.button("🚀 Run Edge Scan", use_container_width=True, type="primary"):
@@ -224,18 +300,18 @@ with tab_screener:
                     
                     current_price = df['Close'].iloc[-1]
                     
-                    # 1. Reality Check (Historical Volatility - HV_30)
+                    # Reality Check (Historical Volatility)
                     daily_returns = df['Close'].pct_change().dropna()
                     realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
                     
-                    # 2. Market Fear (Implied Volatility Proxy)
+                    # Market Fear (Implied Volatility Proxy)
                     beta = t_data.info.get('beta', 1.0) or 1.0
                     implied_vol = st.session_state.current_vix * beta
                     
-                    # 3. The Holy Grail Metric (Volatility Risk Premium)
+                    # VRP Edge
                     vrp_edge = implied_vol - realized_vol
                     
-                    # RSI for exhaustion direction
+                    # RSI
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -256,13 +332,11 @@ with tab_screener:
             res_df = pd.DataFrame(screener_results)
             
             if strategy_target == "Selling Puts (Oversold Stocks)":
-                # Oversold and High Edge
                 filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge (Your Profit)"] >= min_edge)]
                 filtered_df = filtered_df.sort_values(by="VRP Edge (Your Profit)", ascending=False) 
                 st.success(f"Found {len(filtered_df)} beaten-down candidates where fear is massively overpricing the puts.")
                 
             else:
-                # Overbought and High Edge
                 filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge (Your Profit)"] >= min_edge)]
                 filtered_df = filtered_df.sort_values(by="VRP Edge (Your Profit)", ascending=False) 
                 st.error(f"Found {len(filtered_df)} overbought candidates where hype is massively overpricing the calls.")
@@ -276,7 +350,7 @@ with tab_screener:
                     "VRP Edge (Your Profit)": "+{:.1f}%"
                 })
                 st.dataframe(display_df, use_container_width=True, hide_index=True)
-                st.info("👉 **Next Step:** Target the tickers at the top. The higher the VRP Edge, the more mathematically overpriced the option premium is!")
+                st.info("👉 **Next Step:** Take the tickers at the top and plug them into your Safe Zone Calculator on Tab 1!")
             else:
                 st.warning("No stocks currently have a high enough VRP Edge. The market might be pricing options too accurately right now.")
 
@@ -357,7 +431,7 @@ with tab2:
 
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
-        num_rows="dynamic", use_container_width=True, key="ledger_editor_final3",
+        num_rows="dynamic", use_container_width=True, key="ledger_editor_final5",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
