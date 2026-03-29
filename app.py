@@ -138,7 +138,7 @@ WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NF
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_ledger = st.tabs(["🌍 Macro Playbook", "🎯 Sniper Safe Zones", "🔎 Live Screener", "📓 Lucky Ledger"])
 
-# --- TAB 1: MACRO PLAYBOOK (Unchanged) ---
+# --- TAB 1: MACRO PLAYBOOK ---
 with tab_macro:
     head_col, btn_col = st.columns([5, 1])
     with head_col: 
@@ -230,10 +230,7 @@ with tab_macro:
             st.markdown("""
             <div class="regime-box color-crash">
                 <div class="regime-title color-crash">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</div>
-                <div class="regime-text">
-                <b>What's happening:</b> Panic mode. Fear is extreme, funding is freezing, and everything is being sold for cash.<br><br>
-                <span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.
-                </div>
+                <div class="regime-text"><span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -241,10 +238,7 @@ with tab_macro:
              st.markdown("""
             <div class="regime-box color-bullish">
                 <div class="regime-title color-bullish">🎯 REGIME: OVERSOLD OPPORTUNITY</div>
-                <div class="regime-text">
-                <b>What's happening:</b> The market is heavily washed out, but the VIX proves there is no systemic panic. <br><br>
-                <span class="action-highlight">Your Move: BUY THE DIP (SELL PUTS).</span> This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.
-                </div>
+                <div class="regime-text"><span class="action-highlight">Your Move: BUY THE DIP (SELL PUTS).</span> This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.</div>
             </div>
             """, unsafe_allow_html=True)           
 
@@ -252,10 +246,7 @@ with tab_macro:
             st.markdown("""
             <div class="regime-box color-bearish">
                 <div class="regime-title color-bearish">⚠️ REGIME: BEARISH / CORRECTION</div>
-                <div class="regime-text">
-                <b>What's happening:</b> Macro headwinds (inflation/dollar strength) are pressuring equities.<br><br>
-                <span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.
-                </div>
+                <div class="regime-text"><span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -263,10 +254,7 @@ with tab_macro:
              st.markdown("""
             <div class="regime-box color-overbought">
                 <div class="regime-title color-overbought">🔥 REGIME: OVERBOUGHT / EXHAUSTED</div>
-                <div class="regime-text">
-                <b>What's happening:</b> Greed is at a maximum. Nearly everything is trending up, making the market vulnerable to a sudden, sharp pullback.<br><br>
-                <span class="action-highlight">Your Move: TAKE PROFITS.</span> Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.
-                </div>
+                <div class="regime-text"><span class="action-highlight">Your Move: TAKE PROFITS.</span> Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.</div>
             </div>
             """, unsafe_allow_html=True)           
             
@@ -274,10 +262,7 @@ with tab_macro:
             st.markdown("""
             <div class="regime-box color-bullish">
                 <div class="regime-title color-bullish">🚀 REGIME: EXTREME BULLISH / RISK-ON</div>
-                <div class="regime-text">
-                <b>What's happening:</b> The "Goldilocks" zone. Money is cheap, inflation is dead, and fear is nonexistent.<br><br>
-                <span class="action-highlight">Your Move: STAY LONG.</span> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist (NVDA, TSLA, etc.). Ride the liquidity wave, but watch the Breadth dials for exhaustion.
-                </div>
+                <div class="regime-text"><span class="action-highlight">Your Move: STAY LONG.</span> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave.</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -285,22 +270,17 @@ with tab_macro:
             st.markdown("""
             <div class="regime-box color-neutral">
                 <div class="regime-title color-neutral">⚖️ REGIME: NEUTRAL / RANGE-BOUND</div>
-                <div class="regime-text">
-                <b>What's happening:</b> The market is chopping sideways, waiting for the next catalyst.<br><br>
-                <span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.
-                </div>
+                <div class="regime-text"><span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.</div>
             </div>
             """, unsafe_allow_html=True)
 
-    except Exception as e:
-        pass
+    except Exception as e: pass
 
-# --- TAB 2: SNIPER SAFE ZONES (FULLY AUTOMATED RISK ENGINE) ---
+# --- TAB 2: SNIPER SAFE ZONES (DYNAMIC TIMEFRAMES & PROXIMITY SNAP) ---
 with tab_safezone:
     st.markdown("#### 🎯 Sniper Safe Zones (100% Automated)")
-    st.caption("Zero inputs. The app calculates RSI, assigns the perfect Risk Multiplier, and overlays it against Structural data.")
+    st.caption("Zero inputs. The app calculates RSI, assigns Risk Multipliers, and executes a 'Proximity Snap' to find the closest safe structural wall.")
     
-    # Removed the Risk Dial completely. Just Ticker, Expiry, and Calculate.
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
     with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
@@ -321,7 +301,7 @@ with tab_safezone:
                     beta = yf_tk.info.get('beta', 1.0) or 1.0
                     days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
                     
-                    # 0. THE AUTO-RISK ENGINE (Calculate RSI)
+                    # 0. THE AUTO-RISK ENGINE
                     try:
                         delta = hist_1y['Close'].diff()
                         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -329,10 +309,8 @@ with tab_safezone:
                         rs = gain / loss
                         live_rsi = 100 - (100 / (1 + rs.iloc[-1]))
                         if pd.isna(live_rsi): live_rsi = 50.0
-                    except:
-                        live_rsi = 50.0
+                    except: live_rsi = 50.0
                     
-                    # Assign Multipliers based on RSI
                     if live_rsi < 40:
                         put_mult, call_mult = 0.5, 1.5
                         risk_status = f"OVERSOLD (RSI: {live_rsi:.1f}). Auto-Aggressive on Puts (0.5x), Conservative on Calls (1.5x)."
@@ -350,7 +328,7 @@ with tab_safezone:
                     base_exp_move = 0.0
                     math_type_str = "Theoretical IV"
                     
-                    # 1. SMART MATH: Attempt to get Market Maker ATM Straddle
+                    # 1. SMART MATH
                     try:
                         avail_exps = yf_tk.options
                         if avail_exps:
@@ -358,16 +336,11 @@ with tab_safezone:
                             if target_exp not in avail_exps: target_exp = avail_exps[0]
                             chain = yf_tk.option_chain(target_exp)
                             
-                            # Find ATM Straddle Cost
                             closest_call = chain.calls.iloc[(chain.calls['strike'] - px).abs().argsort()[:1]]
                             closest_put = chain.puts.iloc[(chain.puts['strike'] - px).abs().argsort()[:1]]
-                            
-                            c_price = closest_call['lastPrice'].values[0]
-                            p_price = closest_put['lastPrice'].values[0]
-                            base_exp_move = float(c_price + p_price)
+                            base_exp_move = float(closest_call['lastPrice'].values[0] + closest_put['lastPrice'].values[0])
                             math_type_str = "Market Maker Straddle"
                             
-                            # Options Walls
                             puts_filtered = chain.puts[(chain.puts['strike'] >= px * 0.70) & (chain.puts['strike'] <= px)]
                             calls_filtered = chain.calls[(chain.calls['strike'] <= px * 1.30) & (chain.calls['strike'] >= px)]
                             if not puts_filtered.empty:
@@ -378,43 +351,66 @@ with tab_safezone:
                                 call_wall_str = f"${call_wall:.2f}"
                     except: pass 
                     
-                    # Fallback to theoretical math if options chain pull failed or move is 0
                     if base_exp_move <= 0:
                         stock_iv_proxy = st.session_state.current_vix * beta
                         base_exp_move = px * (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
                     
-                    # Apply Auto-Multipliers
                     math_floor = px - (base_exp_move * put_mult)
                     math_ceil = px + (base_exp_move * call_mult)
                     
-                    # 2. PRICE ACTION
-                    s1 = hist_1y['Low'].tail(30).min()
-                    r1 = hist_1y['High'].tail(30).max()
-                    older_data = hist_1y.iloc[-126:-30]
-                    s2 = older_data['Low'].min() if not older_data.empty else s1
-                    r2 = older_data['High'].max() if not older_data.empty else r1
+                    # 2. PRICE ACTION (DYNAMIC TIMEFRAMES)
+                    lookback_days = max(days_to_exp, 5) # Minimum 5 days for noise reduction
+                    macro_lookback = max(days_to_exp * 3, 20) 
+                    
+                    s1 = hist_1y['Low'].tail(lookback_days).min()
+                    r1 = hist_1y['High'].tail(lookback_days).max()
+                    s2 = hist_1y['Low'].tail(macro_lookback).min() 
+                    r2 = hist_1y['High'].tail(macro_lookback).max()
                     
                     # 3. VOLUME PROFILE 
-                    hist_6m = hist_1y.tail(126).copy()
-                    hist_6m['Price_Bin'] = pd.cut(hist_6m['Close'], bins=30)
-                    vol_profile = hist_6m.groupby('Price_Bin', observed=False)['Volume'].sum()
-                    poc_interval = vol_profile.idxmax()
-                    poc_price = poc_interval.mid
+                    hist_vol = hist_1y.tail(macro_lookback).copy()
+                    hist_vol['Price_Bin'] = pd.cut(hist_vol['Close'], bins=20)
+                    vol_profile = hist_vol.groupby('Price_Bin', observed=False)['Volume'].sum()
+                    poc_price = vol_profile.idxmax().mid
                     
-                    # CALCULATE THE ULTIMATE SNIPER STRIKES
-                    target_put = min(math_floor, s1)
-                    if put_wall is not None and put_wall < px:
-                        target_put = min(target_put, put_wall)
-                        
-                    target_call = max(math_ceil, r1)
-                    if call_wall is not None and call_wall > px:
-                        target_call = max(target_call, call_wall)
+                    # 4. THE PROXIMITY SNAP ALGORITHM
+                    # Limit how deep we will chase a wall so we don't destroy premium
+                    snap_limit = base_exp_move * 0.75 
                     
+                    # Put Candidates (Must be below Math Floor, but not too far)
+                    put_candidates = []
+                    if math_floor - s1 >= 0 and (math_floor - s1) <= snap_limit: put_candidates.append((f"S1 ({lookback_days}d Low)", s1))
+                    if math_floor - s2 >= 0 and (math_floor - s2) <= snap_limit: put_candidates.append((f"S2 ({macro_lookback}d Low)", s2))
+                    if math_floor - poc_price >= 0 and (math_floor - poc_price) <= snap_limit: put_candidates.append(("Volume POC", poc_price))
+                    if put_wall is not None and math_floor - put_wall >= 0 and (math_floor - put_wall) <= snap_limit: put_candidates.append(("Options Put Wall", put_wall))
+                    
+                    if put_candidates:
+                        best_put = max(put_candidates, key=lambda x: x[1])
+                        target_put = best_put[1]
+                        put_subtext = f"Snapped to {best_put[0]} at ${target_put:.2f}. Tucked safely behind structure, just below the Math Floor (${math_floor:.2f})."
+                    else:
+                        target_put = math_floor
+                        put_subtext = f"Using Auto-Math Floor. Structural supports are too far away to justify sacrificing your premium."
+
+                    # Call Candidates
+                    call_candidates = []
+                    if r1 - math_ceil >= 0 and (r1 - math_ceil) <= snap_limit: call_candidates.append((f"R1 ({lookback_days}d High)", r1))
+                    if r2 - math_ceil >= 0 and (r2 - math_ceil) <= snap_limit: call_candidates.append((f"R2 ({macro_lookback}d High)", r2))
+                    if poc_price - math_ceil >= 0 and (poc_price - math_ceil) <= snap_limit: call_candidates.append(("Volume POC", poc_price))
+                    if call_wall is not None and call_wall - math_ceil >= 0 and (call_wall - math_ceil) <= snap_limit: call_candidates.append(("Options Call Wall", call_wall))
+                    
+                    if call_candidates:
+                        best_call = min(call_candidates, key=lambda x: x[1])
+                        target_call = best_call[1]
+                        call_subtext = f"Snapped to {best_call[0]} at ${target_call:.2f}. Blocked safely by structure, just above the Math Ceiling (${math_ceil:.2f})."
+                    else:
+                        target_call = math_ceil
+                        call_subtext = f"Using Auto-Math Ceiling. Structural resistance is too far away to justify sacrificing your premium."
+
                     st.write("---")
                     st.markdown(f"### **{calc_tk} X-Ray Analysis | Current Price: ${px:.2f}**")
                     
                     col_m, col_s1, col_s2, col_s3 = st.columns(4)
-                    
                     with col_m:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">1. Auto-Math Move</div>
@@ -426,16 +422,16 @@ with tab_safezone:
                     with col_s1:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">2. Price Action</div>
-                            <div style="color:#00b09b;"><b>S1 (30d):</b> ${s1:.2f} <br><b>S2 (6mo):</b> ${s2:.2f}</div>
-                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1 (30d):</b> ${r1:.2f} <br><b>R2 (6mo):</b> ${r2:.2f}</div>
-                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Historical Bounces</div>
+                            <div style="color:#00b09b;"><b>S1 ({lookback_days}d):</b> ${s1:.2f} <br><b>S2 ({macro_lookback}d):</b> ${s2:.2f}</div>
+                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1 ({lookback_days}d):</b> ${r1:.2f} <br><b>R2 ({macro_lookback}d):</b> ${r2:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Dynamic Timeframe</div>
                             </div>""", unsafe_allow_html=True)
                             
                     with col_s2:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">3. Volume Profile</div>
                             <div class="sniper-value neutral-color">POC: ${poc_price:.2f}</div>
-                            <div style="font-size:0.8em; color:gray; margin-top:10px;">6-Mo Max Volume Node</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:10px;">{macro_lookback}-Day Volume Node</div>
                             </div>""", unsafe_allow_html=True)
                             
                     with col_s3:
@@ -451,15 +447,15 @@ with tab_safezone:
                     
                     st.markdown(f"""
                     <div class="target-box-put">
-                        <div class="target-title" style="color: #00b09b;">🟢 TARGET PUT STRIKE: ${target_put:.2f} (or lower)</div>
-                        <div class="target-sub">Safest combination of Auto-Math (${math_floor:.2f}), Structural S1 (${s1:.2f}), and Options Wall ({put_wall_str}).</div>
+                        <div class="target-title" style="color: #00b09b;">🟢 TARGET PUT STRIKE: ${target_put:.2f}</div>
+                        <div class="target-sub">{put_subtext}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
                     st.markdown(f"""
                     <div class="target-box-call">
-                        <div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL STRIKE: ${target_call:.2f} (or higher)</div>
-                        <div class="target-sub">Safest combination of Auto-Math (${math_ceil:.2f}), Structural R1 (${r1:.2f}), and Options Wall ({call_wall_str}).</div>
+                        <div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL STRIKE: ${target_call:.2f}</div>
+                        <div class="target-sub">{call_subtext}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -471,10 +467,8 @@ with tab_screener:
     st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
     
     col_filt1, col_filt2 = st.columns(2)
-    with col_filt1:
-        strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
-    with col_filt2:
-        min_edge = st.slider("Minimum VRP Edge (+%)", min_value=0, max_value=25, value=5, step=1)
+    with col_filt1: strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
+    with col_filt2: min_edge = st.slider("Minimum VRP Edge (+%)", min_value=0, max_value=25, value=5, step=1)
         
     if st.button("🚀 Run Edge Scan", use_container_width=True, type="primary", key="btn2"):
         with st.spinner("Calculating Implied vs Historical Volatility Edges..."):
