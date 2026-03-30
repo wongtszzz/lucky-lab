@@ -188,4 +188,509 @@ def get_macro_live(symbol):
 @st.cache_data(ttl=900)
 def get_automated_breadth(ticker_list):
     try:
-        df = yf.
+        df = yf.download(ticker_list, period="1mo", progress=False)
+        close_df = df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
+        above_20ma, valid_count = 0, 0
+        for s in ticker_list:
+            if s in close_df.columns:
+                prices = close_df[s].dropna()
+                if len(prices) >= 20:
+                    valid_count += 1
+                    if prices.iloc[-1] > prices.tail(20).mean(): above_20ma += 1
+        if valid_count == 0: return 50.0, 0, len(ticker_list)
+        return (above_20ma / valid_count) * 100, above_20ma, valid_count
+    except: return 50.0, 0, len(ticker_list)
+
+@st.cache_data(ttl=900)
+def get_sniper_history(ticker_str):
+    hist = pd.DataFrame()
+    exps = []
+    try:
+        t = yf.Ticker(ticker_str)
+        hist = t.history(period='1y')
+    except: pass 
+    try:
+        t = yf.Ticker(ticker_str)
+        exps = list(t.options)
+    except: pass 
+    return hist, exps
+
+@st.cache_data(ttl=900)
+def get_options_chain(ticker_str, exp_date):
+    try:
+        t = yf.Ticker(ticker_str)
+        chain = t.option_chain(exp_date)
+        return chain.calls, chain.puts
+    except: return pd.DataFrame(), pd.DataFrame()
+
+@st.cache_data(ttl=1800)
+def get_screener_data(ticker):
+    try:
+        t_data = yf.Ticker(ticker)
+        df = t_data.history(period="2mo")
+        if len(df) < 30: return None
+        current_price = df['Close'].iloc[-1]
+        daily_returns = df['Close'].pct_change().dropna()
+        realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
+        return df, current_price, realized_vol
+    except: return None
+
+# --- 3. UI TABS ---
+tab_macro, tab_safezone, tab_screener, tab_catalyst, tab_ledger = st.tabs([
+    "🌍 Macro Playbook", 
+    "🎯 Sniper Safe Zones", 
+    "🔎 Live Screener", 
+    "⚡ Catalyst Radar", 
+    "📓 Lucky Ledger"
+])
+
+# --- TAB 1: MACRO PLAYBOOK ---
+with tab_macro:
+    head_col, btn_col = st.columns([5, 1])
+    with head_col: 
+        st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
+    with btn_col: 
+        if st.button("🔄 Refresh Data", use_container_width=True, key="ref1"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    try:
+        oil_px, oil_pct = get_macro_live("CL=F")
+        dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")
+        vix_px, vix_pct = get_macro_live("^VIX")
+        st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
+        
+        oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 85 else "🔴 Spiking")
+        dxy_status = "🟢 Weak" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 105 else "🔴 Strong")
+        vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("🛢️ WTI Crude Oil", f"${oil_px:,.2f}", f"{oil_status} ({oil_pct:+.2f}%)", delta_color="inverse" if oil_px > 80 else "normal")
+        m2.metric("💵 US Dollar (DXY)", f"{dxy_px:,.2f}", f"{dxy_status} ({dxy_pct:+.2f}%)", delta_color="inverse" if dxy_px > 105 else "normal")
+        m3.metric("📉 Volatility (VIX)", f"{vix_px:,.2f}", f"{vix_status} ({vix_pct:+.2f}%)", delta_color="inverse" if vix_px > 25 else "normal")
+
+        st.write("---")
+        
+        sp500_sectors = ["XLK", "XLV", "XLF", "XLY", "XLC", "XLI", "XLP", "XLE", "XLU", "XLRE", "XLB"]
+        nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX", "AMD", "PEP", "CSCO", "TMUS", "ADBE"]
+        
+        s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
+        nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
+        breadth_avg = (s5tw_pct + nctw_pct) / 2
+        
+        st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
+        b1, b2 = st.columns(2)
+        b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
+        b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
+
+        st.write("---")
+        
+        st.markdown("#### 🧠 Live Market Synthesis")
+        syn_oil = "Energy prices are running hot, putting upward pressure on inflation and acting as a headwind for rate cuts." if oil_px > 85 else "Crude oil remains contained, alleviating inflation fears and supporting risk assets."
+        syn_dxy = "The US Dollar is showing strength, tightening global liquidity and pressuring multinational tech earnings." if dxy_px > 105 else "A weaker dollar is currently providing a highly favorable liquidity environment for equities."
+        syn_vix = "However, the VIX is elevated, indicating institutional funds are actively buying downside protection. Fear is present in the order book." if vix_px > 25 else "Volatility is crushed, showing market complacency and a clear 'risk-on' environment."
+        
+        if breadth_avg >= 80: syn_brd = "Under the hood, participation is exceptionally strong (Overbought). The rally is mathematically exhausted and highly vulnerable to a sudden pullback."
+        elif breadth_avg <= 20: syn_brd = "Market breadth is severely washed out (Oversold), BUT the VIX indicates pure panic. This is capitulation, not a safe entry." if vix_px > 30 else "Market breadth is severely washed out (Oversold) while fear (VIX) remains contained, creating a rare structural buying opportunity."
+        else: syn_brd = "Market breadth is healthy and neutral, showing a standard rotation of capital between sectors."
+
+        st.markdown(f"""
+        <div class="synthesis-box">
+            <b>Current Conditions:</b> {syn_oil} {syn_dxy} {syn_vix} <br><br>
+            <b>Internal Health:</b> {syn_brd}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("#### 📖 Actionable Strategy Playbook")
+        
+        if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
+            st.markdown("""<div class="regime-box color-crash"><div class="regime-title color-crash">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</div><div class="regime-text"><span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.</div></div>""", unsafe_allow_html=True)
+        elif breadth_avg <= 20 and vix_px <= 25:
+             st.markdown("""<div class="regime-box color-bullish"><div class="regime-title color-bullish">🎯 REGIME: OVERSOLD OPPORTUNITY</div><div class="regime-text"><span class="action-highlight">Your Move: BUY THE DIP (SELL PUTS).</span> This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.</div></div>""", unsafe_allow_html=True)           
+        elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
+            st.markdown("""<div class="regime-box color-bearish"><div class="regime-title color-bearish">⚠️ REGIME: BEARISH / CORRECTION</div><div class="regime-text"><span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.</div></div>""", unsafe_allow_html=True)
+        elif breadth_avg >= 80:
+             st.markdown("""<div class="regime-box color-overbought"><div class="regime-title color-overbought">🔥 REGIME: OVERBOUGHT / EXHAUSTED</div><div class="regime-text"><span class="action-highlight">Your Move: TAKE PROFITS.</span> Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.</div></div>""", unsafe_allow_html=True)           
+        elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
+            st.markdown("""<div class="regime-box color-bullish"><div class="regime-title color-bullish">🚀 REGIME: EXTREME BULLISH / RISK-ON</div><div class="regime-text"><span class="action-highlight">Your Move: STAY LONG.</span> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave.</div></div>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""<div class="regime-box color-neutral"><div class="regime-title color-neutral">⚖️ REGIME: NEUTRAL / RANGE-BOUND</div><div class="regime-text"><span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.</div></div>""", unsafe_allow_html=True)
+
+    except Exception as e: pass
+
+# --- TAB 2: SNIPER SAFE ZONES ---
+with tab_safezone:
+    st.markdown("#### 🎯 Sniper Safe Zones (100% Automated)")
+    st.caption("Zero inputs. The app calculates RSI, assigns Risk Multipliers, and executes a 'Proximity Snap' to find the closest safe structural wall.")
+    
+    c1, c2, c3 = st.columns([1, 1, 2])
+    with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
+    with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
+    with c3:
+        st.write(""); st.write("")
+        run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
+    
+    if run_calc:
+        with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
+            try:
+                hist_1y, avail_exps = get_sniper_history(calc_tk)
+                
+                if hist_1y.empty:
+                    st.error(f"Invalid Ticker or No Data Found for {calc_tk}. Please check spelling or wait for API limits to reset.")
+                else:
+                    px = float(hist_1y['Close'].iloc[-1])
+                    beta = 1.0 
+                    days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
+                    
+                    try:
+                        delta = hist_1y['Close'].diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        live_rsi = 100 - (100 / (1 + rs.iloc[-1]))
+                        if pd.isna(live_rsi): live_rsi = 50.0
+                    except: live_rsi = 50.0
+                    
+                    if live_rsi < 40:
+                        put_mult, call_mult = 0.5, 1.5
+                        risk_status = f"OVERSOLD (RSI: {live_rsi:.1f}). Auto-Aggressive on Puts (0.5x), Conservative on Calls (1.5x)."
+                    elif live_rsi > 60:
+                        put_mult, call_mult = 1.5, 0.5
+                        risk_status = f"OVERBOUGHT (RSI: {live_rsi:.1f}). Auto-Conservative on Puts (1.5x), Aggressive on Calls (0.5x)."
+                    else:
+                        put_mult, call_mult = 1.0, 1.0
+                        risk_status = f"NEUTRAL (RSI: {live_rsi:.1f}). Balanced Risk Applied (1.0x move)."
+
+                    st.markdown(f"<div class='auto-risk-banner'>🤖 <b>Auto-Risk Engine Active:</b> {risk_status}</div>", unsafe_allow_html=True)
+                    
+                    put_wall_str, call_wall_str = "N/A", "N/A"
+                    put_wall, call_wall = None, None
+                    base_exp_move = 0.0
+                    math_type_str = "Theoretical IV"
+                    
+                    try:
+                        if avail_exps:
+                            target_exp = calc_ex.strftime('%Y-%m-%d')
+                            if target_exp not in avail_exps: target_exp = avail_exps[0]
+                            
+                            calls, puts = get_options_chain(calc_tk, target_exp)
+                            
+                            if not calls.empty and not puts.empty:
+                                closest_call = calls.iloc[(calls['strike'] - px).abs().argsort()[:1]]
+                                closest_put = puts.iloc[(puts['strike'] - px).abs().argsort()[:1]]
+                                base_exp_move = float(closest_call['lastPrice'].values[0] + closest_put['lastPrice'].values[0])
+                                math_type_str = "Market Maker Straddle"
+                                
+                                puts_filtered = puts[(puts['strike'] >= px * 0.70) & (puts['strike'] <= px)]
+                                calls_filtered = calls[(calls['strike'] <= px * 1.30) & (calls['strike'] >= px)]
+                                if not puts_filtered.empty:
+                                    put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
+                                    put_wall_str = f"${put_wall:.2f}"
+                                if not calls_filtered.empty:
+                                    call_wall = calls_filtered.loc[calls_filtered['openInterest'].idxmax()]['strike']
+                                    call_wall_str = f"${call_wall:.2f}"
+                    except: pass 
+                    
+                    if base_exp_move <= 0:
+                        stock_iv_proxy = st.session_state.current_vix * beta
+                        base_exp_move = px * (stock_iv_proxy / 100) * np.sqrt(days_to_exp / 365)
+                    
+                    math_floor = px - (base_exp_move * put_mult)
+                    math_ceil = px + (base_exp_move * call_mult)
+                    
+                    lookback_days = max(days_to_exp, 5) 
+                    macro_lookback = max(days_to_exp * 3, 20) 
+                    
+                    s1 = hist_1y['Low'].tail(lookback_days).min()
+                    r1 = hist_1y['High'].tail(lookback_days).max()
+                    s2 = hist_1y['Low'].tail(macro_lookback).min() 
+                    r2 = hist_1y['High'].tail(macro_lookback).max()
+                    
+                    hist_vol = hist_1y.tail(macro_lookback).copy()
+                    hist_vol['Price_Bin'] = pd.cut(hist_vol['Close'], bins=20)
+                    vol_profile = hist_vol.groupby('Price_Bin', observed=False)['Volume'].sum()
+                    poc_price = vol_profile.idxmax().mid
+                    
+                    snap_limit = base_exp_move * 0.75 
+                    
+                    put_candidates = []
+                    if math_floor - s1 >= 0 and (math_floor - s1) <= snap_limit: put_candidates.append((f"S1 ({lookback_days}d Low)", s1))
+                    if math_floor - s2 >= 0 and (math_floor - s2) <= snap_limit: put_candidates.append((f"S2 ({macro_lookback}d Low)", s2))
+                    if math_floor - poc_price >= 0 and (math_floor - poc_price) <= snap_limit: put_candidates.append(("Volume POC", poc_price))
+                    if put_wall is not None and math_floor - put_wall >= 0 and (math_floor - put_wall) <= snap_limit: put_candidates.append(("Options Put Wall", put_wall))
+                    
+                    if put_candidates:
+                        best_put = max(put_candidates, key=lambda x: x[1])
+                        target_put = best_put[1]
+                        put_subtext = f"Snapped to {best_put[0]} at ${target_put:.2f}. Tucked safely behind structure, just below the Math Floor (${math_floor:.2f})."
+                    else:
+                        target_put = math_floor
+                        put_subtext = f"Using Auto-Math Floor. Structural supports are too far away to justify sacrificing your premium."
+
+                    call_candidates = []
+                    if r1 - math_ceil >= 0 and (r1 - math_ceil) <= snap_limit: call_candidates.append((f"R1 ({lookback_days}d High)", r1))
+                    if r2 - math_ceil >= 0 and (r2 - math_ceil) <= snap_limit: call_candidates.append((f"R2 ({macro_lookback}d High)", r2))
+                    if poc_price - math_ceil >= 0 and (poc_price - math_ceil) <= snap_limit: call_candidates.append(("Volume POC", poc_price))
+                    if call_wall is not None and call_wall - math_ceil >= 0 and (call_wall - math_ceil) <= snap_limit: call_candidates.append(("Options Call Wall", call_wall))
+                    
+                    if call_candidates:
+                        best_call = min(call_candidates, key=lambda x: x[1])
+                        target_call = best_call[1]
+                        call_subtext = f"Snapped to {best_call[0]} at ${target_call:.2f}. Blocked safely by structure, just above the Math Ceiling (${math_ceil:.2f})."
+                    else:
+                        target_call = math_ceil
+                        call_subtext = f"Using Auto-Math Ceiling. Structural resistance is too far away to justify sacrificing your premium."
+
+                    st.write("---")
+                    st.markdown(f"### **{calc_tk} X-Ray Analysis | Current Price: ${px:.2f}**")
+                    
+                    col_m, col_s1, col_s2, col_s3 = st.columns(4)
+                    with col_m:
+                        st.markdown(f"""<div class="sniper-box">
+                            <div class="sniper-title">1. Auto-Math Move</div>
+                            <div class="sniper-value put-color">Floor: ${math_floor:.2f}</div>
+                            <div class="sniper-value call-color">Ceiling: ${math_ceil:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Base: {math_type_str}</div>
+                            </div>""", unsafe_allow_html=True)
+                            
+                    with col_s1:
+                        st.markdown(f"""<div class="sniper-box">
+                            <div class="sniper-title">2. Price Action</div>
+                            <div style="color:#00b09b;"><b>S1 ({lookback_days}d):</b> ${s1:.2f} <br><b>S2 ({macro_lookback}d):</b> ${s2:.2f}</div>
+                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1 ({lookback_days}d):</b> ${r1:.2f} <br><b>R2 ({macro_lookback}d):</b> ${r2:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Dynamic Timeframe</div>
+                            </div>""", unsafe_allow_html=True)
+                            
+                    with col_s2:
+                        st.markdown(f"""<div class="sniper-box">
+                            <div class="sniper-title">3. Volume Profile</div>
+                            <div class="sniper-value neutral-color">POC: ${poc_price:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:10px;">{macro_lookback}-Day Volume Node</div>
+                            </div>""", unsafe_allow_html=True)
+                            
+                    with col_s3:
+                        st.markdown(f"""<div class="sniper-box">
+                            <div class="sniper-title">4. Options Walls</div>
+                            <div style="color:#00b09b; font-size:1.2em;"><b>Put Wall:</b> {put_wall_str}</div>
+                            <div style="color:#ff4b4b; font-size:1.2em; margin-top:5px;"><b>Call Wall:</b> {call_wall_str}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Max Open Interest</div>
+                            </div>""", unsafe_allow_html=True)
+                    
+                    st.write("---")
+                    st.markdown("#### 🎯 Ultimate Target Strikes")
+                    st.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00b09b;">🟢 TARGET PUT STRIKE: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL STRIKE: ${target_call:.2f}</div><div class="target-sub">{call_subtext}</div></div>""", unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"Calculation Error: {e}")
+
+# --- TAB 3: THE OPPORTUNITY SCREENER ---
+with tab_screener:
+    st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
+    
+    col_filt1, col_filt2 = st.columns(2)
+    with col_filt1: strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
+    with col_filt2: min_edge = st.slider("Minimum VRP Edge (+%)", min_value=0, max_value=25, value=5, step=1)
+        
+    if st.button("🚀 Run Edge Scan", use_container_width=True, type="primary", key="btn2"):
+        with st.spinner("Calculating Implied vs Historical Volatility Edges..."):
+            screener_results = []
+            for ticker in WATCHLIST:
+                try:
+                    time.sleep(0.1)
+                    screener_data = get_screener_data(ticker)
+                    if screener_data is None: continue
+                    df, current_price, realized_vol = screener_data
+                    
+                    beta = 1.0
+                    implied_vol = st.session_state.current_vix * beta
+                    vrp_edge = implied_vol - realized_vol
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    rsi_14 = 100 - (100 / (1 + rs.iloc[-1]))
+                    
+                    screener_results.append({
+                        "Ticker": ticker, "Price": round(current_price, 2), "RSI (14)": round(rsi_14, 1),
+                        "Realized Vol": round(realized_vol, 1), "Implied Vol": round(implied_vol, 1), "VRP Edge": round(vrp_edge, 1)
+                    })
+                except: pass 
+            
+            res_df = pd.DataFrame(screener_results)
+            if strategy_target == "Selling Puts (Oversold Stocks)":
+                filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
+                st.success(f"Found {len(filtered_df)} candidates.")
+            else:
+                filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
+                st.error(f"Found {len(filtered_df)} candidates.")
+                
+            if not filtered_df.empty:
+                st.dataframe(filtered_df.style.format({"Price": "${:.2f}", "RSI (14)": "{:.1f}", "Realized Vol": "{:.1f}%", "Implied Vol": "{:.1f}%", "VRP Edge": "+{:.1f}%"}), use_container_width=True, hide_index=True)
+
+# --- TAB 4: CATALYST RADAR ---
+with tab_catalyst:
+    st.markdown("#### ⚡ Event-Driven Catalyst Radar")
+    st.caption("Front-run market volatility by tracking prediction market probabilities for major economic events.")
+    
+    @st.cache_data(ttl=3600)
+    def get_prediction_data():
+        try:
+            kalshi_key = st.secrets.get("KALSHI_KEY", None)
+            if kalshi_key: pass 
+        except: pass
+        
+        return [
+            {
+                "date": "Next Wed, 8:30 AM EST",
+                "title": "US CPI Inflation (YoY)",
+                "outcome": "Will CPI come in above 2.8%?",
+                "prob": 64,
+                "impact": "If Hot (>2.8%): DXY Spikes, Tech (QQQ) Drops. Rates stay higher for longer.",
+                "playbook": "Avoid selling naked puts on Tech. Shift to Call Credit Spreads on overbought growth stocks."
+            },
+            {
+                "date": "Next Fri, 8:30 AM EST",
+                "title": "Non-Farm Payrolls (Jobs)",
+                "outcome": "Will US add >180k jobs?",
+                "prob": 82,
+                "impact": "If Strong (>180k): Goldilocks scenario confirmed. Consumer spending remains robust.",
+                "playbook": "Aggressively sell Puts on high-quality Mega-Caps (AAPL, AMZN). Market will reward economic resilience."
+            },
+            {
+                "date": "Upcoming FOMC",
+                "title": "Federal Reserve Rate Decision",
+                "outcome": "Will the Fed cut rates by 25bps?",
+                "prob": 22,
+                "impact": "If No Cut (Hold): Small initial shock to small-caps (IWM), but large-caps will absorb it.",
+                "playbook": "Wait for the post-meeting press conference (Powell). Sell Iron Condors to capture the 'IV Crush' immediately after he speaks."
+            }
+        ]
+        
+    events = get_prediction_data()
+    st.info("💡 **Quant Tip:** When an event has a very high probability (e.g., 85%+), the market has usually already priced it in. The edge is found when the options market is pricing in a massive crash (high VIX), but the prediction markets show the event is likely a 'nothing-burger.'")
+    st.write("---")
+    
+    for idx, ev in enumerate(events):
+        st.markdown(f"""
+        <div class="catalyst-card">
+            <div class="cat-date">📅 {ev['date']}</div>
+            <div class="cat-title">{ev['title']}</div>
+            <div class="cat-prob-container">
+                <div class="cat-prob-text">{ev['prob']}%</div>
+                <div class="cat-prob-desc">Crowd Probability: <b>{ev['outcome']}</b></div>
+            </div>
+            <div class="cat-impact"><b>Market Impact:</b> {ev['impact']}</div>
+            <div class="cat-playbook"><b>Options Playbook:</b> {ev['playbook']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- TAB 5: LUCKY LEDGER (LOCKED) ---
+with tab_ledger:
+    st.markdown("""
+    <div class="creed-box">
+        <div class="creed-title">🧠 The Quants Creed</div>
+        <div class="creed-text"><b>1. Hope is not a strategy.</b> Cut your losses mechanically.<br><b>2. Watch the clock.</b> Beware of Market-on-Close (MOC) volatility and the notorious Friday Flush.</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    df_j = st.session_state.journal
+    
+    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
+    total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
+    total_closed = len(realized_df)
+    wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
+    win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
+    
+    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
+    active_count = len(active_df)
+    try:
+        strikes = pd.to_numeric(active_df["Strike"], errors='coerce').fillna(0)
+        qtys = pd.to_numeric(active_df["Qty"], errors='coerce').fillna(0)
+        capital_at_risk = (strikes * 100 * qtys).sum()
+    except:
+        capital_at_risk = 0.0
+        
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday()) 
+    end_of_week = start_of_week + timedelta(days=6) 
+    temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
+    weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
+    
+    weekly_realized = this_week_df[~this_week_df["Status"].astype(str).str.contains("Open", na=False)]
+    
+    if not weekly_realized.empty and weekly_realized["Premium"].max() > 0:
+        top_win_idx = weekly_realized["Premium"].idxmax()
+        top_winner_str = f"{weekly_realized.loc[top_win_idx, 'Ticker']} (+${weekly_realized.loc[top_win_idx, 'Premium']:.0f})"
+    else:
+        top_winner_str = "N/A"
+        
+    if not weekly_realized.empty and weekly_realized["Premium"].min() < 0:
+        top_loss_idx = weekly_realized["Premium"].idxmin()
+        top_loser_str = f"Loser: {weekly_realized.loc[top_loss_idx, 'Ticker']} (${weekly_realized.loc[top_loss_idx, 'Premium']:.0f})"
+    else:
+        top_loser_str = "Loser: N/A"
+    
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
+    k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
+    k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
+    k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
+    
+    with st.expander("➕ Log New Trade", expanded=True):
+        with st.form("new_trade_form", clear_on_submit=True):
+            l1, l2, l3, l4 = st.columns(4)
+            _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
+            n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=7))
+            n_ty = l3.selectbox("Type", ["Short Put", "Short Call"])
+            n_qt = l4.number_input("Qty", value=1, min_value=1)
+            
+            l5, l6 = st.columns(2)
+            n_st = l5.number_input("Strike(s)", value=None, format="%.1f", placeholder="e.g. 150.5")
+            n_op = l6.number_input("Open Price", value=None, format="%.2f", placeholder="e.g. 0.85")
+            
+            submitted = st.form_submit_button("🚀 Commit Trade", use_container_width=True, type="primary")
+            
+            if submitted:
+                n_tk = _raw_tk.upper() if _raw_tk else None
+                if n_tk and n_st is not None and n_op is not None:
+                    comm = round(n_qt * 1.05, 2)
+                    net = round((float(n_op) * 100 * n_qt) - comm, 2)
+                    
+                    stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Active"
+                    new_row = pd.DataFrame([{
+                        "Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, 
+                        "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
+                        "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
+                    }])
+                    st.session_state.journal = sort_ledger(pd.concat([df_j, new_row], ignore_index=True))
+                    save_journal(st.session_state.journal)
+                    st.rerun()
+
+    st.write("### Trade History")
+    
+    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
+    
+    edt = st.data_editor(
+        display_df, 
+        num_rows="dynamic", 
+        use_container_width=True, 
+        key="ledger_final_locked",
+        column_config={
+            "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
+            "Strike": st.column_config.NumberColumn(format="%.2f"),
+            "Open Price": st.column_config.NumberColumn(format="%.2f"),
+            "Close Price": st.column_config.NumberColumn(format="%.2f"),
+            "Commission": st.column_config.NumberColumn(format="$%.2f"),
+            "Premium": st.column_config.NumberColumn(format="$%.2f")
+        }
+    )
+
+    if not edt.equals(display_df):
+        updated_df = refresh_calculations(edt)
+        st.session_state.journal = updated_df
+        save_journal(updated_df)
+        st.rerun()
+
+st.markdown(f'<div class="footer-right">Last Synced to GitHub: {st.session_state.last_update}</div>', unsafe_allow_html=True)
