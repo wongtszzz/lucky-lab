@@ -1,8 +1,8 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-03-27,GLD,Short Call,426.0,2026-03-30,0.65,0.0,1,1.85,63.15,Open / Active
 2026-03-27,TSLA,Short Put,337.5,2026-03-30,0.43,0.0,1,1.05,41.95,Open / Active
 2026-03-27,MSFT,Short Put,337.5,2026-03-30,0.19,0.0,1,1.05,17.95,Open / Active
 2026-03-27,JPM,Short Put,267.5,2026-04-02,1.03,0.0,1,1.05,101.95,Open / Active
+2026-03-27,GLD,Short Call,426.0,2026-03-30,0.65,0.23,1,1.85,40.15,Closed (Win)
 2026-03-26,TSM,Short Put,312.5,2026-03-27,0.18,0.0,1,0.8,17.2,Expired (Win)
 2026-03-26,TSM,Short Put,317.5,2026-03-27,0.38,0.0,1,1.05,36.95,Expired (Win)
 2026-03-25,GLD,Short Call,430.0,2026-03-27,2.03,0.0,1,0.8,202.2,Expired (Win)
