@@ -112,6 +112,36 @@ def sort_ledger(df):
     df['Date'] = df['temp_date'].dt.strftime('%Y-%m-%d')
     return df.drop(columns=['temp_date', 'status_rank']).reset_index(drop=True)
 
+def refresh_calculations(current_df):
+    if current_df.empty: return current_df
+    current_df = current_df.copy()
+    
+    for col in ["Strike", "Open Price", "Close Price", "Qty", "Commission"]:
+        current_df[col] = pd.to_numeric(current_df[col], errors='coerce').fillna(0)
+        
+    def update_row(r):
+        open_p = float(r["Open Price"]) if pd.notna(r["Open Price"]) else 0.0
+        close_p = float(r["Close Price"]) if pd.notna(r["Close Price"]) else 0.0
+        qty = int(r["Qty"]) if pd.notna(r["Qty"]) else 1
+        comm = float(r["Commission"]) if pd.notna(r["Commission"]) else 0.0
+        
+        p = round(((open_p - close_p) * 100 * qty) - comm, 2)
+        
+        try: ex_d = pd.to_datetime(r["Expiry"]).date()
+        except: ex_d = datetime.now().date()
+        
+        if close_p > 0: 
+            s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
+        elif ex_d < datetime.now().date(): 
+            s = "Expired (Win)"
+        else: 
+            s = "Open / Active"
+            
+        return pd.Series([p, s])
+        
+    current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
+    return sort_ledger(current_df)
+
 def save_journal(df):
     try:
         df_sorted = sort_ledger(df)
@@ -134,7 +164,7 @@ def load_journal():
             if c not in df.columns:
                 if c == "Date": df[c] = datetime.now().strftime("%Y-%m-%d")
                 else: df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
-        return sort_ledger(df[COLS])
+        return refresh_calculations(df[COLS])
     except: return pd.DataFrame(columns=COLS)
 
 if 'journal' not in st.session_state: 
@@ -518,7 +548,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (FULLY RESTORED!) ---
+# --- TAB 5: LUCKY LEDGER (CUSTOM 4-BOX DASHBOARD RESTORED) ---
 with tab_ledger:
     st.markdown("""
     <div class="creed-box">
@@ -527,36 +557,61 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    # 1. KPI Dashboard
+    # --- 1. THE 4 EXACT KPI BOXES ---
     df_j = st.session_state.journal
+    
+    # KPI 1: Total Realized & Win Rate
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     total_closed = len(realized_df)
     wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
     win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
     
+    # KPI 2: Active Trades & Capital at Risk
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
-    
-    # Safe calculation for capital at risk
     try:
         strikes = pd.to_numeric(active_df["Strike"], errors='coerce').fillna(0)
         qtys = pd.to_numeric(active_df["Qty"], errors='coerce').fillna(0)
         capital_at_risk = (strikes * 100 * qtys).sum()
     except:
         capital_at_risk = 0.0
+        
+    # KPI 3: This Week P&L (Mon - Sun)
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday()) 
+    end_of_week = start_of_week + timedelta(days=6) 
+    df_j['temp_exp'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    this_week_df = df_j[(df_j['temp_exp'] >= start_of_week) & (df_j['temp_exp'] <= end_of_week)]
+    weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    r1c1, r1c2 = st.columns(2)
-    r1c1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
-    r1c2.metric("Active Trades 📈", str(active_count), f"Capital at Risk: ${capital_at_risk:,.0f}", delta_color="off")
+    # KPI 4: Top Winner / Top Loser
+    if not realized_df.empty and realized_df["Premium"].max() > 0:
+        top_win_idx = realized_df["Premium"].idxmax()
+        top_winner_str = f"{realized_df.loc[top_win_idx, 'Ticker']} (+${realized_df.loc[top_win_idx, 'Premium']:.0f})"
+    else:
+        top_winner_str = "N/A"
+        
+    if not realized_df.empty and realized_df["Premium"].min() < 0:
+        top_loss_idx = realized_df["Premium"].idxmin()
+        top_loser_str = f"Loser: {realized_df.loc[top_loss_idx, 'Ticker']} (${realized_df.loc[top_loss_idx, 'Premium']:.0f})"
+    else:
+        top_loser_str = "Loser: N/A"
     
-    # 2. Log New Trade Form
+    # Render the 4 requested boxes side-by-side
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
+    k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
+    k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
+    k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
+    
+    # --- 2. LOG NEW TRADE FORM (Only Short Put / Short Call) ---
     with st.expander("➕ Log New Trade", expanded=True):
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3, l4 = st.columns(4)
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
             n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=7))
-            n_ty = l3.selectbox("Type", ["Short Put", "Short Call", "Iron Condor", "Credit Spread"])
+            n_ty = l3.selectbox("Type", ["Short Put", "Short Call"])
             n_qt = l4.number_input("Qty", value=1, min_value=1)
             
             l5, l6 = st.columns(2)
@@ -570,6 +625,7 @@ with tab_ledger:
                 if n_tk and n_st is not None and n_op is not None:
                     comm = round(n_qt * 1.05, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
+                    
                     stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Active"
                     new_row = pd.DataFrame([{
                         "Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, 
@@ -580,25 +636,9 @@ with tab_ledger:
                     save_journal(st.session_state.journal)
                     st.rerun()
 
-    # 3. Dynamic Trade History Editor
+    # --- 3. DYNAMIC TRADE EDITOR ---
     st.write("### Trade History")
     
-    def refresh_calculations(current_df):
-        for col in ["Strike", "Open Price", "Close Price", "Qty", "Commission"]:
-            current_df[col] = pd.to_numeric(current_df[col], errors='coerce').fillna(0)
-        def update_row(r):
-            open_p, close_p = float(r["Open Price"]), float(r["Close Price"])
-            p = round(((open_p - close_p) * 100 * int(r["Qty"])) - float(r["Commission"]), 2)
-            try: ex_d = pd.to_datetime(r["Expiry"]).date()
-            except: ex_d = datetime.now().date()
-            
-            if close_p > 0: s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
-            elif ex_d < datetime.now().date(): s = "Expired (Win)"
-            else: s = "Open / Active"
-            return pd.Series([p, s])
-        current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
-        return sort_ledger(current_df)
-
     edt = st.data_editor(
         st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
         num_rows="dynamic", 
