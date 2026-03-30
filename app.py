@@ -80,6 +80,17 @@ st.markdown("""
 st.markdown("### 🧪 Lucky Quants Lab | Pre-Market War Room")
 st.divider()
 
+# --- RATE LIMIT BYPASS (DISGUISED SESSION) ---
+@st.cache_resource
+def get_yf_session():
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+    })
+    return session
+
+yf_session = get_yf_session()
+
 # API Connections
 try:
     API_KEY = st.secrets["ALPACA_KEY"]
@@ -194,7 +205,7 @@ with tab_macro:
     
     try:
         def get_macro_live(symbol):
-            t = yf.Ticker(symbol)
+            t = yf.Ticker(symbol, session=yf_session)
             df = t.history(period='5d')
             if len(df) >= 2: return float(df['Close'].iloc[-1]), ((float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])) * 100
             return 0.0, 0.0
@@ -221,7 +232,7 @@ with tab_macro:
         @st.cache_data(ttl=900)
         def get_automated_breadth(ticker_list):
             try:
-                df = yf.download(ticker_list, period="1mo", progress=False)
+                df = yf.download(ticker_list, period="1mo", progress=False, session=yf_session)
                 close_df = df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
                 above_20ma = 0
                 valid_count = 0
@@ -295,11 +306,11 @@ with tab_safezone:
     if run_calc:
         with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
             try:
-                yf_tk = yf.Ticker(calc_tk)
+                yf_tk = yf.Ticker(calc_tk, session=yf_session)
                 hist_1y = yf_tk.history(period='1y')
                 
                 if hist_1y.empty:
-                    st.error("Invalid Ticker or No Data Found.")
+                    st.error("Invalid Ticker or No Data Found. Rate limits bypassed.")
                 else:
                     px = float(hist_1y['Close'].iloc[-1])
                     beta = yf_tk.info.get('beta', 1.0) or 1.0
@@ -459,7 +470,7 @@ with tab_screener:
             screener_results = []
             for ticker in WATCHLIST:
                 try:
-                    t_data = yf.Ticker(ticker)
+                    t_data = yf.Ticker(ticker, session=yf_session)
                     df = t_data.history(period="2mo")
                     if len(df) < 30: continue
                     current_price = df['Close'].iloc[-1]
