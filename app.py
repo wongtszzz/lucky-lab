@@ -66,7 +66,6 @@ st.markdown("""
     
     .auto-risk-banner { background-color: rgba(255, 255, 255, 0.05); padding: 10px 15px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); margin-top: 10px; margin-bottom: 10px; text-align: center; }
     
-    /* CATALYST TAB STYLES */
     .catalyst-card { background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(128, 128, 128, 0.2); border-radius: 8px; padding: 20px; margin-bottom: 15px; }
     .cat-date { color: #2962FF; font-weight: bold; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
     .cat-title { font-size: 1.4em; font-weight: bold; margin: 5px 0 15px 0; }
@@ -146,7 +145,7 @@ if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
-# --- 3. UI TABS (NOW WITH 5 TABS) ---
+# --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_catalyst, tab_ledger = st.tabs([
     "🌍 Macro Playbook", 
     "🎯 Sniper Safe Zones", 
@@ -417,7 +416,7 @@ with tab_safezone:
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
 
-# --- TAB 3: THE OPPORTUNITY SCREENER (Unchanged) ---
+# --- TAB 3: THE OPPORTUNITY SCREENER ---
 with tab_screener:
     st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
     
@@ -462,25 +461,18 @@ with tab_screener:
             if not filtered_df.empty:
                 st.dataframe(filtered_df.style.format({"Price": "${:.2f}", "RSI (14)": "{:.1f}", "Realized Vol": "{:.1f}%", "Implied Vol": "{:.1f}%", "VRP Edge": "+{:.1f}%"}), use_container_width=True, hide_index=True)
 
-# --- TAB 4: CATALYST RADAR (NEW) ---
+# --- TAB 4: CATALYST RADAR ---
 with tab_catalyst:
     st.markdown("#### ⚡ Event-Driven Catalyst Radar")
     st.caption("Front-run market volatility by tracking prediction market probabilities for major economic events.")
     
-    @st.cache_data(ttl=3600) # Cache for 1 hour
+    @st.cache_data(ttl=3600)
     def get_prediction_data():
-        # WARNING: To use live Kalshi data, you must insert your API keys in st.secrets.
-        # Until then, this generates highly realistic structural synthetic data based on real macroeconomic calendars.
         try:
             kalshi_key = st.secrets.get("KALSHI_KEY", None)
-            if kalshi_key:
-                # Placeholder for live Kalshi API logic:
-                # headers = {"Authorization": f"Bearer {kalshi_key}"}
-                # response = requests.get("https://trading-api.kalshi.com/trade-api/v2/events", headers=headers)
-                pass 
+            if kalshi_key: pass 
         except: pass
         
-        # Graceful Fallback: Realistic Macro Synthetic Data
         return [
             {
                 "date": "Next Wed, 8:30 AM EST",
@@ -509,7 +501,6 @@ with tab_catalyst:
         ]
         
     events = get_prediction_data()
-    
     st.info("💡 **Quant Tip:** When an event has a very high probability (e.g., 85%+), the market has usually already priced it in. The edge is found when the options market is pricing in a massive crash (high VIX), but the prediction markets show the event is likely a 'nothing-burger.'")
     st.write("---")
     
@@ -527,8 +518,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-
-# --- TAB 5: LEDGER (Unchanged) ---
+# --- TAB 5: LUCKY LEDGER (FULLY RESTORED!) ---
 with tab_ledger:
     st.markdown("""
     <div class="creed-box">
@@ -537,6 +527,97 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    edt = st.data_editor(st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), num_rows="dynamic", use_container_width=True, key="ledger_final")
+    # 1. KPI Dashboard
+    df_j = st.session_state.journal
+    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
+    total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
+    total_closed = len(realized_df)
+    wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
+    win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
+    
+    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
+    active_count = len(active_df)
+    
+    # Safe calculation for capital at risk
+    try:
+        strikes = pd.to_numeric(active_df["Strike"], errors='coerce').fillna(0)
+        qtys = pd.to_numeric(active_df["Qty"], errors='coerce').fillna(0)
+        capital_at_risk = (strikes * 100 * qtys).sum()
+    except:
+        capital_at_risk = 0.0
+    
+    r1c1, r1c2 = st.columns(2)
+    r1c1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
+    r1c2.metric("Active Trades 📈", str(active_count), f"Capital at Risk: ${capital_at_risk:,.0f}", delta_color="off")
+    
+    # 2. Log New Trade Form
+    with st.expander("➕ Log New Trade", expanded=True):
+        with st.form("new_trade_form", clear_on_submit=True):
+            l1, l2, l3, l4 = st.columns(4)
+            _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
+            n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=7))
+            n_ty = l3.selectbox("Type", ["Short Put", "Short Call", "Iron Condor", "Credit Spread"])
+            n_qt = l4.number_input("Qty", value=1, min_value=1)
+            
+            l5, l6 = st.columns(2)
+            n_st = l5.number_input("Strike(s)", value=None, format="%.1f", placeholder="e.g. 150.5")
+            n_op = l6.number_input("Open Price", value=None, format="%.2f", placeholder="e.g. 0.85")
+            
+            submitted = st.form_submit_button("🚀 Commit Trade", use_container_width=True, type="primary")
+            
+            if submitted:
+                n_tk = _raw_tk.upper() if _raw_tk else None
+                if n_tk and n_st is not None and n_op is not None:
+                    comm = round(n_qt * 1.05, 2)
+                    net = round((float(n_op) * 100 * n_qt) - comm, 2)
+                    stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Active"
+                    new_row = pd.DataFrame([{
+                        "Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, 
+                        "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
+                        "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
+                    }])
+                    st.session_state.journal = pd.concat([df_j.drop(columns=['temp_exp'], errors='ignore'), new_row], ignore_index=True)
+                    save_journal(st.session_state.journal)
+                    st.rerun()
+
+    # 3. Dynamic Trade History Editor
+    st.write("### Trade History")
+    
+    def refresh_calculations(current_df):
+        for col in ["Strike", "Open Price", "Close Price", "Qty", "Commission"]:
+            current_df[col] = pd.to_numeric(current_df[col], errors='coerce').fillna(0)
+        def update_row(r):
+            open_p, close_p = float(r["Open Price"]), float(r["Close Price"])
+            p = round(((open_p - close_p) * 100 * int(r["Qty"])) - float(r["Commission"]), 2)
+            try: ex_d = pd.to_datetime(r["Expiry"]).date()
+            except: ex_d = datetime.now().date()
+            
+            if close_p > 0: s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
+            elif ex_d < datetime.now().date(): s = "Expired (Win)"
+            else: s = "Open / Active"
+            return pd.Series([p, s])
+        current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
+        return sort_ledger(current_df)
+
+    edt = st.data_editor(
+        st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
+        num_rows="dynamic", 
+        use_container_width=True, 
+        key="ledger_final_restored",
+        column_config={
+            "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
+            "Strike": st.column_config.NumberColumn(format="%.2f"),
+            "Open Price": st.column_config.NumberColumn(format="%.2f"),
+            "Close Price": st.column_config.NumberColumn(format="%.2f"),
+            "Commission": st.column_config.NumberColumn(format="$%.2f"),
+            "Premium": st.column_config.NumberColumn(format="$%.2f")
+        }
+    )
+
+    if not edt.equals(st.session_state.journal.drop(columns=['temp_exp'], errors='ignore')):
+        updated_df = refresh_calculations(edt)
+        st.session_state.journal = updated_df
+        save_journal(updated_df)
+        st.rerun()
 
 st.markdown(f'<div class="footer-right">Last Synced to GitHub: {st.session_state.last_update}</div>', unsafe_allow_html=True)
