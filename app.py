@@ -175,7 +175,7 @@ if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
-# --- 2. GLOBAL CACHED FETCHERS (THE RATE LIMIT SHIELD) ---
+# --- 2. GLOBAL CACHED FETCHERS (ARMORED AGAINST RATE LIMITS) ---
 @st.cache_data(ttl=900)
 def get_macro_live(symbol):
     try:
@@ -203,12 +203,24 @@ def get_automated_breadth(ticker_list):
 
 @st.cache_data(ttl=900)
 def get_sniper_history(ticker_str):
+    hist = pd.DataFrame()
+    exps = []
+    
+    # 1. Armored Price Fetch
     try:
         t = yf.Ticker(ticker_str)
         hist = t.history(period='1y')
+    except:
+        pass # If this fails, hist stays empty
+        
+    # 2. Armored Options Expiration Fetch (Often blocked by Yahoo)
+    try:
+        t = yf.Ticker(ticker_str)
         exps = list(t.options)
-        return hist, exps
-    except: return pd.DataFrame(), []
+    except:
+        pass # If this fails, exps stays empty, but hist survives!
+        
+    return hist, exps
 
 @st.cache_data(ttl=900)
 def get_options_chain(ticker_str, exp_date):
@@ -331,11 +343,10 @@ with tab_safezone:
                 hist_1y, avail_exps = get_sniper_history(calc_tk)
                 
                 if hist_1y.empty:
-                    st.error("Invalid Ticker or No Data Found. API Rate limits may be active.")
+                    st.error(f"Invalid Ticker or No Data Found for {calc_tk}. Please check spelling or wait for API limits to reset.")
                 else:
                     px = float(hist_1y['Close'].iloc[-1])
-                    # Removed beta entirely from info pull to bypass 429 errors
-                    beta = 1.0 
+                    beta = 1.0 # Bypassing info block
                     days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
                     
                     try:
@@ -493,14 +504,12 @@ with tab_screener:
             screener_results = []
             for ticker in WATCHLIST:
                 try:
-                    time.sleep(0.1) # Micro-pause to prevent rate limits
+                    time.sleep(0.1)
                     screener_data = get_screener_data(ticker)
                     if screener_data is None: continue
                     df, current_price, realized_vol = screener_data
                     
-                    # Removed info.beta pull to prevent rate limits
                     beta = 1.0
-                    
                     implied_vol = st.session_state.current_vix * beta
                     vrp_edge = implied_vol - realized_vol
                     delta = df['Close'].diff()
