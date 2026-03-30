@@ -98,30 +98,19 @@ except Exception as e:
 FILE_PATH = "lucky_ledger.csv"
 COLS = ["Date", "Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
-# --- BUG FIX: Strict Sorting & Hiding Temp Columns ---
 def sort_ledger(df):
     if df.empty: return df
-    df = df.copy()
-    
-    # Create temporary sort columns
     df['temp_date'] = pd.to_datetime(df['Date'], errors='coerce')
-    
-    # Enforce strict hierarchy: Open -> Closed -> Expired
     def rank_status(s):
         s = str(s)
         if "Open" in s: return 1
-        if "Closed" in s: return 2
-        if "Expired" in s: return 3
+        if "Win" in s: return 2
+        if "Loss" in s: return 3
         return 4
-        
     df['status_rank'] = df['Status'].apply(rank_status)
-    
-    # Sort by Date (Newest First), then by Status Rank
     df = df.sort_values(by=['temp_date', 'status_rank'], ascending=[False, True])
     df['Date'] = df['temp_date'].dt.strftime('%Y-%m-%d')
-    
-    # Scrub the ugly helper columns before returning
-    return df.drop(columns=['temp_date', 'status_rank', 'temp_exp'], errors='ignore').reset_index(drop=True)
+    return df.drop(columns=['temp_date', 'status_rank']).reset_index(drop=True)
 
 def refresh_calculations(current_df):
     if current_df.empty: return current_df
@@ -156,7 +145,6 @@ def refresh_calculations(current_df):
 def save_journal(df):
     try:
         df_sorted = sort_ledger(df)
-        # Only save the exact standard columns to CSV
         csv_content = df_sorted[COLS].to_csv(index=False)
         commit_message = f"Ledger Auto-Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         try:
@@ -187,6 +175,63 @@ if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
 
+# --- 2. GLOBAL CACHED FETCHERS (THE RATE LIMIT SHIELD) ---
+@st.cache_data(ttl=900)
+def get_macro_live(symbol):
+    try:
+        t = yf.Ticker(symbol)
+        df = t.history(period='5d')
+        if len(df) >= 2: return float(df['Close'].iloc[-1]), ((float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])) * 100
+    except: pass
+    return 0.0, 0.0
+
+@st.cache_data(ttl=900)
+def get_automated_breadth(ticker_list):
+    try:
+        df = yf.download(ticker_list, period="1mo", progress=False)
+        close_df = df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
+        above_20ma, valid_count = 0, 0
+        for s in ticker_list:
+            if s in close_df.columns:
+                prices = close_df[s].dropna()
+                if len(prices) >= 20:
+                    valid_count += 1
+                    if prices.iloc[-1] > prices.tail(20).mean(): above_20ma += 1
+        if valid_count == 0: return 50.0, 0, len(ticker_list)
+        return (above_20ma / valid_count) * 100, above_20ma, valid_count
+    except: return 50.0, 0, len(ticker_list)
+
+@st.cache_data(ttl=900)
+def get_sniper_history(ticker_str):
+    try:
+        t = yf.Ticker(ticker_str)
+        hist = t.history(period='1y')
+        beta = t.info.get('beta', 1.0) or 1.0
+        exps = list(t.options)
+        return hist, beta, exps
+    except: return pd.DataFrame(), 1.0, []
+
+@st.cache_data(ttl=900)
+def get_options_chain(ticker_str, exp_date):
+    try:
+        t = yf.Ticker(ticker_str)
+        chain = t.option_chain(exp_date)
+        return chain.calls, chain.puts
+    except: return pd.DataFrame(), pd.DataFrame()
+
+@st.cache_data(ttl=1800)
+def get_screener_data(ticker):
+    try:
+        t_data = yf.Ticker(ticker)
+        df = t_data.history(period="2mo")
+        if len(df) < 30: return None
+        current_price = df['Close'].iloc[-1]
+        daily_returns = df['Close'].pct_change().dropna()
+        realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
+        beta = t_data.info.get('beta', 1.0) or 1.0
+        return df, current_price, realized_vol, beta
+    except: return None
+
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_screener, tab_catalyst, tab_ledger = st.tabs([
     "🌍 Macro Playbook", 
@@ -202,15 +247,11 @@ with tab_macro:
     with head_col: 
         st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
     with btn_col: 
-        st.button("🔄 Refresh Data", use_container_width=True, key="ref1")
+        if st.button("🔄 Refresh Data", use_container_width=True, key="ref1"):
+            st.cache_data.clear() # Clears the cache to fetch fresh data
+            st.rerun()
     
     try:
-        def get_macro_live(symbol):
-            t = yf.Ticker(symbol)
-            df = t.history(period='5d')
-            if len(df) >= 2: return float(df['Close'].iloc[-1]), ((float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])) * 100
-            return 0.0, 0.0
-        
         oil_px, oil_pct = get_macro_live("CL=F")
         dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")
         vix_px, vix_pct = get_macro_live("^VIX")
@@ -230,24 +271,6 @@ with tab_macro:
         sp500_sectors = ["XLK", "XLV", "XLF", "XLY", "XLC", "XLI", "XLP", "XLE", "XLU", "XLRE", "XLB"]
         nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX", "AMD", "PEP", "CSCO", "TMUS", "ADBE"]
         
-        @st.cache_data(ttl=900)
-        def get_automated_breadth(ticker_list):
-            try:
-                df = yf.download(ticker_list, period="1mo", progress=False)
-                close_df = df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
-                above_20ma = 0
-                valid_count = 0
-                for s in ticker_list:
-                    if s in close_df.columns:
-                        prices = close_df[s].dropna()
-                        if len(prices) >= 20:
-                            valid_count += 1
-                            if prices.iloc[-1] > prices.tail(20).mean(): above_20ma += 1
-                if valid_count == 0: return 50.0, 0, len(ticker_list)
-                return (above_20ma / valid_count) * 100, above_20ma, valid_count
-            except:
-                return 50.0, 0, len(ticker_list)
-                
         s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
         nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
         breadth_avg = (s5tw_pct + nctw_pct) / 2
@@ -307,14 +330,12 @@ with tab_safezone:
     if run_calc:
         with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
             try:
-                yf_tk = yf.Ticker(calc_tk)
-                hist_1y = yf_tk.history(period='1y')
+                hist_1y, beta, avail_exps = get_sniper_history(calc_tk)
                 
                 if hist_1y.empty:
-                    st.error("Invalid Ticker or No Data Found.")
+                    st.error("Invalid Ticker or No Data Found. API Rate limits may be active.")
                 else:
                     px = float(hist_1y['Close'].iloc[-1])
-                    beta = yf_tk.info.get('beta', 1.0) or 1.0
                     days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
                     
                     try:
@@ -344,25 +365,26 @@ with tab_safezone:
                     math_type_str = "Theoretical IV"
                     
                     try:
-                        avail_exps = yf_tk.options
                         if avail_exps:
                             target_exp = calc_ex.strftime('%Y-%m-%d')
                             if target_exp not in avail_exps: target_exp = avail_exps[0]
-                            chain = yf_tk.option_chain(target_exp)
                             
-                            closest_call = chain.calls.iloc[(chain.calls['strike'] - px).abs().argsort()[:1]]
-                            closest_put = chain.puts.iloc[(chain.puts['strike'] - px).abs().argsort()[:1]]
-                            base_exp_move = float(closest_call['lastPrice'].values[0] + closest_put['lastPrice'].values[0])
-                            math_type_str = "Market Maker Straddle"
+                            calls, puts = get_options_chain(calc_tk, target_exp)
                             
-                            puts_filtered = chain.puts[(chain.puts['strike'] >= px * 0.70) & (chain.puts['strike'] <= px)]
-                            calls_filtered = chain.calls[(chain.calls['strike'] <= px * 1.30) & (chain.calls['strike'] >= px)]
-                            if not puts_filtered.empty:
-                                put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
-                                put_wall_str = f"${put_wall:.2f}"
-                            if not calls_filtered.empty:
-                                call_wall = calls_filtered.loc[calls_filtered['openInterest'].idxmax()]['strike']
-                                call_wall_str = f"${call_wall:.2f}"
+                            if not calls.empty and not puts.empty:
+                                closest_call = calls.iloc[(calls['strike'] - px).abs().argsort()[:1]]
+                                closest_put = puts.iloc[(puts['strike'] - px).abs().argsort()[:1]]
+                                base_exp_move = float(closest_call['lastPrice'].values[0] + closest_put['lastPrice'].values[0])
+                                math_type_str = "Market Maker Straddle"
+                                
+                                puts_filtered = puts[(puts['strike'] >= px * 0.70) & (puts['strike'] <= px)]
+                                calls_filtered = calls[(calls['strike'] <= px * 1.30) & (calls['strike'] >= px)]
+                                if not puts_filtered.empty:
+                                    put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
+                                    put_wall_str = f"${put_wall:.2f}"
+                                if not calls_filtered.empty:
+                                    call_wall = calls_filtered.loc[calls_filtered['openInterest'].idxmax()]['strike']
+                                    call_wall_str = f"${call_wall:.2f}"
                     except: pass 
                     
                     if base_exp_move <= 0:
@@ -471,13 +493,10 @@ with tab_screener:
             screener_results = []
             for ticker in WATCHLIST:
                 try:
-                    t_data = yf.Ticker(ticker)
-                    df = t_data.history(period="2mo")
-                    if len(df) < 30: continue
-                    current_price = df['Close'].iloc[-1]
-                    daily_returns = df['Close'].pct_change().dropna()
-                    realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
-                    beta = t_data.info.get('beta', 1.0) or 1.0
+                    screener_data = get_screener_data(ticker)
+                    if screener_data is None: continue
+                    df, current_price, realized_vol, beta = screener_data
+                    
                     implied_vol = st.session_state.current_vix * beta
                     vrp_edge = implied_vol - realized_vol
                     delta = df['Close'].diff()
@@ -643,34 +662,4 @@ with tab_ledger:
                         "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
                         "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
                     }])
-                    st.session_state.journal = sort_ledger(pd.concat([df_j, new_row], ignore_index=True))
-                    save_journal(st.session_state.journal)
-                    st.rerun()
-
-    st.write("### Trade History")
-    
-    # Render pure dataframe, hide all temp calculation columns
-    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
-    
-    edt = st.data_editor(
-        display_df, 
-        num_rows="dynamic", 
-        use_container_width=True, 
-        key="ledger_final_locked",
-        column_config={
-            "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
-            "Strike": st.column_config.NumberColumn(format="%.2f"),
-            "Open Price": st.column_config.NumberColumn(format="%.2f"),
-            "Close Price": st.column_config.NumberColumn(format="%.2f"),
-            "Commission": st.column_config.NumberColumn(format="$%.2f"),
-            "Premium": st.column_config.NumberColumn(format="$%.2f")
-        }
-    )
-
-    if not edt.equals(display_df):
-        updated_df = refresh_calculations(edt)
-        st.session_state.journal = updated_df
-        save_journal(updated_df)
-        st.rerun()
-
-st.markdown(f'<div class="footer-right">Last Synced to GitHub: {st.session_state.last_update}</div>', unsafe_allow_html=True)
+                    st
