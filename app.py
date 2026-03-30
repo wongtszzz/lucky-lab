@@ -98,19 +98,30 @@ except Exception as e:
 FILE_PATH = "lucky_ledger.csv"
 COLS = ["Date", "Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
+# --- BUG FIX: Strict Sorting & Hiding Temp Columns ---
 def sort_ledger(df):
     if df.empty: return df
+    df = df.copy()
+    
+    # Create temporary sort columns
     df['temp_date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
+    # Enforce strict hierarchy: Open -> Closed -> Expired
     def rank_status(s):
         s = str(s)
         if "Open" in s: return 1
-        if "Win" in s: return 2
-        if "Loss" in s: return 3
+        if "Closed" in s: return 2
+        if "Expired" in s: return 3
         return 4
+        
     df['status_rank'] = df['Status'].apply(rank_status)
+    
+    # Sort by Date (Newest First), then by Status Rank
     df = df.sort_values(by=['temp_date', 'status_rank'], ascending=[False, True])
     df['Date'] = df['temp_date'].dt.strftime('%Y-%m-%d')
-    return df.drop(columns=['temp_date', 'status_rank']).reset_index(drop=True)
+    
+    # Scrub the ugly helper columns before returning
+    return df.drop(columns=['temp_date', 'status_rank', 'temp_exp'], errors='ignore').reset_index(drop=True)
 
 def refresh_calculations(current_df):
     if current_df.empty: return current_df
@@ -145,6 +156,7 @@ def refresh_calculations(current_df):
 def save_journal(df):
     try:
         df_sorted = sort_ledger(df)
+        # Only save the exact standard columns to CSV
         csv_content = df_sorted[COLS].to_csv(index=False)
         commit_message = f"Ledger Auto-Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         try:
@@ -548,7 +560,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (CUSTOM 4-BOX DASHBOARD) ---
+# --- TAB 5: LUCKY LEDGER (4-BOX DASHBOARD LOCKED & BUG-FIXED) ---
 with tab_ledger:
     st.markdown("""
     <div class="creed-box">
@@ -557,15 +569,16 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    # --- 1. THE 4 EXACT KPI BOXES ---
     df_j = st.session_state.journal
     
+    # 1. Total Realized & Win Rate
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     total_closed = len(realized_df)
     wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
     win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
     
+    # 2. Active Trades & Risk
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     try:
@@ -575,13 +588,16 @@ with tab_ledger:
     except:
         capital_at_risk = 0.0
         
+    # 3. This Week P&L (Mon - Sun)
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
-    df_j['temp_exp'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
-    this_week_df = df_j[(df_j['temp_exp'] >= start_of_week) & (df_j['temp_exp'] <= end_of_week)]
+    # Use the cleaned date column without mutating main state
+    temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
+    # 4. Top Winner & Loser
     if not realized_df.empty and realized_df["Premium"].max() > 0:
         top_win_idx = realized_df["Premium"].idxmax()
         top_winner_str = f"{realized_df.loc[top_win_idx, 'Ticker']} (+${realized_df.loc[top_win_idx, 'Premium']:.0f})"
@@ -600,7 +616,7 @@ with tab_ledger:
     k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
     k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
     
-    # --- 2. LOG NEW TRADE FORM (Only Short Put / Short Call) ---
+    # --- LOG NEW TRADE FORM (Only Put/Call) ---
     with st.expander("➕ Log New Trade", expanded=True):
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3, l4 = st.columns(4)
@@ -627,18 +643,20 @@ with tab_ledger:
                         "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
                         "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
                     }])
-                    st.session_state.journal = pd.concat([df_j.drop(columns=['temp_exp'], errors='ignore'), new_row], ignore_index=True)
+                    st.session_state.journal = sort_ledger(pd.concat([df_j, new_row], ignore_index=True))
                     save_journal(st.session_state.journal)
                     st.rerun()
 
-    # --- 3. DYNAMIC TRADE EDITOR ---
     st.write("### Trade History")
     
+    # Render pure dataframe, hide all temp calculation columns
+    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
+    
     edt = st.data_editor(
-        st.session_state.journal.drop(columns=['temp_exp'], errors='ignore'), 
+        display_df, 
         num_rows="dynamic", 
         use_container_width=True, 
-        key="ledger_final_restored",
+        key="ledger_final_locked",
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
@@ -649,7 +667,7 @@ with tab_ledger:
         }
     )
 
-    if not edt.equals(st.session_state.journal.drop(columns=['temp_exp'], errors='ignore')):
+    if not edt.equals(display_df):
         updated_df = refresh_calculations(edt)
         st.session_state.journal = updated_df
         save_journal(updated_df)
