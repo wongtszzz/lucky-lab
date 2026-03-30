@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import io
 import base64
+import time
 import yfinance as yf
-import requests
 from datetime import datetime, timedelta
 from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
 from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest
@@ -206,10 +206,9 @@ def get_sniper_history(ticker_str):
     try:
         t = yf.Ticker(ticker_str)
         hist = t.history(period='1y')
-        beta = t.info.get('beta', 1.0) or 1.0
         exps = list(t.options)
-        return hist, beta, exps
-    except: return pd.DataFrame(), 1.0, []
+        return hist, exps
+    except: return pd.DataFrame(), []
 
 @st.cache_data(ttl=900)
 def get_options_chain(ticker_str, exp_date):
@@ -228,8 +227,7 @@ def get_screener_data(ticker):
         current_price = df['Close'].iloc[-1]
         daily_returns = df['Close'].pct_change().dropna()
         realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
-        beta = t_data.info.get('beta', 1.0) or 1.0
-        return df, current_price, realized_vol, beta
+        return df, current_price, realized_vol
     except: return None
 
 # --- 3. UI TABS ---
@@ -248,7 +246,7 @@ with tab_macro:
         st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
     with btn_col: 
         if st.button("🔄 Refresh Data", use_container_width=True, key="ref1"):
-            st.cache_data.clear() # Clears the cache to fetch fresh data
+            st.cache_data.clear()
             st.rerun()
     
     try:
@@ -330,12 +328,14 @@ with tab_safezone:
     if run_calc:
         with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
             try:
-                hist_1y, beta, avail_exps = get_sniper_history(calc_tk)
+                hist_1y, avail_exps = get_sniper_history(calc_tk)
                 
                 if hist_1y.empty:
                     st.error("Invalid Ticker or No Data Found. API Rate limits may be active.")
                 else:
                     px = float(hist_1y['Close'].iloc[-1])
+                    # Removed beta entirely from info pull to bypass 429 errors
+                    beta = 1.0 
                     days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
                     
                     try:
@@ -493,9 +493,13 @@ with tab_screener:
             screener_results = []
             for ticker in WATCHLIST:
                 try:
+                    time.sleep(0.1) # Micro-pause to prevent rate limits
                     screener_data = get_screener_data(ticker)
                     if screener_data is None: continue
-                    df, current_price, realized_vol, beta = screener_data
+                    df, current_price, realized_vol = screener_data
+                    
+                    # Removed info.beta pull to prevent rate limits
+                    beta = 1.0
                     
                     implied_vol = st.session_state.current_vix * beta
                     vrp_edge = implied_vol - realized_vol
@@ -579,7 +583,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (4-BOX DASHBOARD LOCKED & BUG-FIXED) ---
+# --- TAB 5: LUCKY LEDGER (LOCKED) ---
 with tab_ledger:
     st.markdown("""
     <div class="creed-box">
@@ -590,14 +594,12 @@ with tab_ledger:
     
     df_j = st.session_state.journal
     
-    # 1. Total Realized & Win Rate
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     total_closed = len(realized_df)
     wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
     win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
     
-    # 2. Active Trades & Risk
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     try:
@@ -607,16 +609,13 @@ with tab_ledger:
     except:
         capital_at_risk = 0.0
         
-    # 3. This Week P&L (Mon - Sun)
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
-    # Use the cleaned date column without mutating main state
     temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
     this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    # 4. Top Winner & Loser
     if not realized_df.empty and realized_df["Premium"].max() > 0:
         top_win_idx = realized_df["Premium"].idxmax()
         top_winner_str = f"{realized_df.loc[top_win_idx, 'Ticker']} (+${realized_df.loc[top_win_idx, 'Premium']:.0f})"
@@ -635,7 +634,6 @@ with tab_ledger:
     k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
     k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
     
-    # --- LOG NEW TRADE FORM (Only Put/Call) ---
     with st.expander("➕ Log New Trade", expanded=True):
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3, l4 = st.columns(4)
@@ -662,4 +660,33 @@ with tab_ledger:
                         "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
                         "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
                     }])
-                    st
+                    st.session_state.journal = sort_ledger(pd.concat([df_j, new_row], ignore_index=True))
+                    save_journal(st.session_state.journal)
+                    st.rerun()
+
+    st.write("### Trade History")
+    
+    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
+    
+    edt = st.data_editor(
+        display_df, 
+        num_rows="dynamic", 
+        use_container_width=True, 
+        key="ledger_final_locked",
+        column_config={
+            "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
+            "Strike": st.column_config.NumberColumn(format="%.2f"),
+            "Open Price": st.column_config.NumberColumn(format="%.2f"),
+            "Close Price": st.column_config.NumberColumn(format="%.2f"),
+            "Commission": st.column_config.NumberColumn(format="$%.2f"),
+            "Premium": st.column_config.NumberColumn(format="$%.2f")
+        }
+    )
+
+    if not edt.equals(display_df):
+        updated_df = refresh_calculations(edt)
+        st.session_state.journal = updated_df
+        save_journal(updated_df)
+        st.rerun()
+
+st.markdown(f'<div class="footer-right">Last Synced to GitHub: {st.session_state.last_update}</div>', unsafe_allow_html=True)
