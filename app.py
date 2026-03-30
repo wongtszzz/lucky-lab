@@ -80,17 +80,6 @@ st.markdown("""
 st.markdown("### 🧪 Lucky Quants Lab | Pre-Market War Room")
 st.divider()
 
-# --- RATE LIMIT BYPASS (DISGUISED SESSION) ---
-@st.cache_resource
-def get_yf_session():
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-    })
-    return session
-
-yf_session = get_yf_session()
-
 # API Connections
 try:
     API_KEY = st.secrets["ALPACA_KEY"]
@@ -205,7 +194,7 @@ with tab_macro:
     
     try:
         def get_macro_live(symbol):
-            t = yf.Ticker(symbol, session=yf_session)
+            t = yf.Ticker(symbol)
             df = t.history(period='5d')
             if len(df) >= 2: return float(df['Close'].iloc[-1]), ((float(df['Close'].iloc[-1]) - float(df['Close'].iloc[-2])) / float(df['Close'].iloc[-2])) * 100
             return 0.0, 0.0
@@ -232,7 +221,7 @@ with tab_macro:
         @st.cache_data(ttl=900)
         def get_automated_breadth(ticker_list):
             try:
-                df = yf.download(ticker_list, period="1mo", progress=False, session=yf_session)
+                df = yf.download(ticker_list, period="1mo", progress=False)
                 close_df = df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
                 above_20ma = 0
                 valid_count = 0
@@ -306,11 +295,11 @@ with tab_safezone:
     if run_calc:
         with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
             try:
-                yf_tk = yf.Ticker(calc_tk, session=yf_session)
+                yf_tk = yf.Ticker(calc_tk)
                 hist_1y = yf_tk.history(period='1y')
                 
                 if hist_1y.empty:
-                    st.error("Invalid Ticker or No Data Found. Rate limits bypassed.")
+                    st.error("Invalid Ticker or No Data Found.")
                 else:
                     px = float(hist_1y['Close'].iloc[-1])
                     beta = yf_tk.info.get('beta', 1.0) or 1.0
@@ -470,7 +459,7 @@ with tab_screener:
             screener_results = []
             for ticker in WATCHLIST:
                 try:
-                    t_data = yf.Ticker(ticker, session=yf_session)
+                    t_data = yf.Ticker(ticker)
                     df = t_data.history(period="2mo")
                     if len(df) < 30: continue
                     current_price = df['Close'].iloc[-1]
@@ -559,7 +548,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (CUSTOM 4-BOX DASHBOARD RESTORED) ---
+# --- TAB 5: LUCKY LEDGER (CUSTOM 4-BOX DASHBOARD) ---
 with tab_ledger:
     st.markdown("""
     <div class="creed-box">
@@ -571,14 +560,12 @@ with tab_ledger:
     # --- 1. THE 4 EXACT KPI BOXES ---
     df_j = st.session_state.journal
     
-    # KPI 1: Total Realized & Win Rate
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     total_closed = len(realized_df)
     wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
     win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
     
-    # KPI 2: Active Trades & Capital at Risk
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     try:
@@ -588,7 +575,6 @@ with tab_ledger:
     except:
         capital_at_risk = 0.0
         
-    # KPI 3: This Week P&L (Mon - Sun)
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
@@ -596,7 +582,6 @@ with tab_ledger:
     this_week_df = df_j[(df_j['temp_exp'] >= start_of_week) & (df_j['temp_exp'] <= end_of_week)]
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    # KPI 4: Top Winner / Top Loser
     if not realized_df.empty and realized_df["Premium"].max() > 0:
         top_win_idx = realized_df["Premium"].idxmax()
         top_winner_str = f"{realized_df.loc[top_win_idx, 'Ticker']} (+${realized_df.loc[top_win_idx, 'Premium']:.0f})"
@@ -609,7 +594,6 @@ with tab_ledger:
     else:
         top_loser_str = "Loser: N/A"
     
-    # Render the 4 requested boxes side-by-side
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
     k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
