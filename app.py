@@ -173,9 +173,19 @@ if 'journal' not in st.session_state:
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
-WATCHLIST = ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "BAC", "DIS", "BA", "UBER", "COIN", "PLTR", "SMCI", "ARM"]
-
 # --- 2. GLOBAL CACHED FETCHERS (ARMORED AGAINST RATE LIMITS) ---
+
+@st.cache_data(ttl=86400) # Scrapes Wikipedia once a day for the SP500 list
+def get_sp500_tickers():
+    try:
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        table = pd.read_html(url)[0]
+        tickers = table['Symbol'].str.replace('.', '-').tolist()
+        return tickers
+    except:
+        # Failsafe list of high-beta targets if Wikipedia blocks the request
+        return ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "COIN", "PLTR", "SMCI", "ARM", "MSTR", "CRWD", "AVGO", "APP"]
+
 @st.cache_data(ttl=900)
 def get_macro_live(symbol):
     try:
@@ -223,16 +233,12 @@ def get_options_chain(ticker_str, exp_date):
         return chain.calls, chain.puts
     except: return pd.DataFrame(), pd.DataFrame()
 
+# The New Vectorized Batch Downloader
 @st.cache_data(ttl=1800)
-def get_screener_data(ticker):
+def get_batch_screener_data(ticker_list):
     try:
-        t_data = yf.Ticker(ticker)
-        df = t_data.history(period="2mo")
-        if len(df) < 30: return None
-        current_price = df['Close'].iloc[-1]
-        daily_returns = df['Close'].pct_change().dropna()
-        realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
-        return df, current_price, realized_vol
+        df = yf.download(ticker_list, period="2mo", progress=False)
+        return df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
     except: return None
 
 # --- 3. UI TABS ---
@@ -484,49 +490,68 @@ with tab_safezone:
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
 
-# --- TAB 3: THE OPPORTUNITY SCREENER ---
+# --- TAB 3: THE OPPORTUNITY SCREENER (BATCH UPGRADE) ---
 with tab_screener:
-    st.markdown("#### 🔎 Live Opportunity Screener (VRP Edge)")
+    st.markdown("#### 🔎 S&P 500 Live Screener (VRP Edge)")
+    st.caption("Now scanning 500 highly liquid stocks simultaneously using vectorized batch downloading.")
     
     col_filt1, col_filt2 = st.columns(2)
     with col_filt1: strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
     with col_filt2: min_edge = st.number_input("Minimum VRP Edge (+%)", min_value=0, max_value=50, value=10, step=5)
         
-    if st.button("🚀 Run Edge Scan", use_container_width=True, type="primary", key="btn2"):
-        with st.spinner("Calculating Implied vs Historical Volatility Edges..."):
+    if st.button("🚀 Run S&P 500 Edge Scan", use_container_width=True, type="primary", key="btn2"):
+        with st.spinner("Downloading 500 stocks and calculating Implied vs Historical Volatility Edges. This usually takes 10-15 seconds..."):
+            
+            # Step 1: Get the massive list dynamically
+            full_watchlist = get_sp500_tickers()
+            
+            # Step 2: Batch Download Everything at once
+            close_prices = get_batch_screener_data(full_watchlist)
+            
             screener_results = []
-            for ticker in WATCHLIST:
-                try:
-                    time.sleep(0.1)
-                    screener_data = get_screener_data(ticker)
-                    if screener_data is None: continue
-                    df, current_price, realized_vol = screener_data
-                    
-                    beta = 1.0
-                    implied_vol = st.session_state.current_vix * beta
-                    vrp_edge = implied_vol - realized_vol
-                    delta = df['Close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    rsi_14 = 100 - (100 / (1 + rs.iloc[-1]))
-                    
-                    screener_results.append({
-                        "Ticker": ticker, "Price": round(current_price, 2), "RSI (14)": round(rsi_14, 1),
-                        "Realized Vol": round(realized_vol, 1), "Implied Vol": round(implied_vol, 1), "VRP Edge": round(vrp_edge, 1)
-                    })
-                except: pass 
+            
+            if close_prices is not None and not close_prices.empty:
+                # Step 3: Run the local math loop. Blazing fast, no network calls.
+                for ticker in full_watchlist:
+                    try:
+                        if ticker not in close_prices.columns: continue
+                        
+                        hist = close_prices[ticker].dropna()
+                        if len(hist) < 30: continue
+                        
+                        current_price = hist.iloc[-1]
+                        daily_returns = hist.pct_change().dropna()
+                        realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
+                        
+                        beta = 1.0 # Keep standard risk proxy to avoid .info ban
+                        implied_vol = st.session_state.current_vix * beta
+                        vrp_edge = implied_vol - realized_vol
+                        
+                        delta = hist.diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        rsi_14 = 100 - (100 / (1 + rs.iloc[-1]))
+                        
+                        screener_results.append({
+                            "Ticker": ticker, "Price": round(current_price, 2), "RSI (14)": round(rsi_14, 1),
+                            "Realized Vol": round(realized_vol, 1), "Implied Vol": round(implied_vol, 1), "VRP Edge": round(vrp_edge, 1)
+                        })
+                    except: pass 
             
             res_df = pd.DataFrame(screener_results)
-            if strategy_target == "Selling Puts (Oversold Stocks)":
-                filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
-                st.success(f"Found {len(filtered_df)} candidates.")
+            if not res_df.empty:
+                if strategy_target == "Selling Puts (Oversold Stocks)":
+                    filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
+                    st.success(f"Found {len(filtered_df)} candidates.")
+                else:
+                    filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
+                    st.error(f"Found {len(filtered_df)} candidates.")
+                    
+                if not filtered_df.empty:
+                    st.dataframe(filtered_df.style.format({"Price": "${:.2f}", "RSI (14)": "{:.1f}", "Realized Vol": "{:.1f}%", "Implied Vol": "{:.1f}%", "VRP Edge": "+{:.1f}%"}), use_container_width=True, hide_index=True)
             else:
-                filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
-                st.error(f"Found {len(filtered_df)} candidates.")
-                
-            if not filtered_df.empty:
-                st.dataframe(filtered_df.style.format({"Price": "${:.2f}", "RSI (14)": "{:.1f}", "Realized Vol": "{:.1f}%", "Implied Vol": "{:.1f}%", "VRP Edge": "+{:.1f}%"}), use_container_width=True, hide_index=True)
+                st.warning("Failed to download batch data. Yahoo Finance might be temporarily down.")
 
 # --- TAB 4: CATALYST RADAR ---
 with tab_catalyst:
