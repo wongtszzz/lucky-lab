@@ -610,7 +610,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (LOCKED) ---
+# --- TAB 5: LUCKY LEDGER (LOCKED & UPDATED TOP WINNER/LOSER LOGIC) ---
 with tab_ledger:
     st.markdown("""
     <div class="creed-box">
@@ -640,20 +640,21 @@ with tab_ledger:
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
     temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    
+    # Isolate all trades for this week (Both Realized and Active)
     this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    weekly_realized = this_week_df[~this_week_df["Status"].astype(str).str.contains("Open", na=False)]
-    
-    if not weekly_realized.empty and weekly_realized["Premium"].max() > 0:
-        top_win_idx = weekly_realized["Premium"].idxmax()
-        top_winner_str = f"{weekly_realized.loc[top_win_idx, 'Ticker']} (+${weekly_realized.loc[top_win_idx, 'Premium']:.0f})"
+    # Calculate Top Winner and Loser from the ENTIRE week's pool, including Open trades
+    if not this_week_df.empty and this_week_df["Premium"].max() > 0:
+        top_win_idx = this_week_df["Premium"].idxmax()
+        top_winner_str = f"{this_week_df.loc[top_win_idx, 'Ticker']} (+${this_week_df.loc[top_win_idx, 'Premium']:.0f})"
     else:
         top_winner_str = "N/A"
         
-    if not weekly_realized.empty and weekly_realized["Premium"].min() < 0:
-        top_loss_idx = weekly_realized["Premium"].idxmin()
-        top_loser_str = f"Loser: {weekly_realized.loc[top_loss_idx, 'Ticker']} (${weekly_realized.loc[top_loss_idx, 'Premium']:.0f})"
+    if not this_week_df.empty and this_week_df["Premium"].min() < 0:
+        top_loss_idx = this_week_df["Premium"].idxmin()
+        top_loser_str = f"Loser: {this_week_df.loc[top_loss_idx, 'Ticker']} (${this_week_df.loc[top_loss_idx, 'Premium']:.0f})"
     else:
         top_loser_str = "Loser: N/A"
     
