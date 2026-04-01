@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-03-31,SNDK,Short Call,680.0,2026-04-02,1.2,0.0,1,1.05,118.95,Open / Active
+2026-03-31,SNDK,Short Call,680.0,2026-04-02,1.2,28.0,1,1.05,-2681.05,Closed (Loss)
 2026-03-30,ASML,Short Put,1120.0,2026-04-02,1.2,0.0,1,0.05,119.95,Open / Active
 2026-03-30,COST,Short Put,930.0,2026-04-02,0.5,0.0,1,0.8,49.2,Open / Active
 2026-03-30,TSM,Short Put,282.5,2026-04-02,0.42,0.0,1,1.05,40.95,Open / Active
