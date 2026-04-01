@@ -138,7 +138,6 @@ def refresh_calculations(current_df):
         elif ex_d < datetime.now().date(): 
             s = "Expired (Win)"
         else: 
-            # 🚨 COMPLETELY STRIPPED OUT GAMMA LOGIC - STRICTLY OPEN / ACTIVE 🚨
             s = "Open / Active"
             
         return pd.Series([p, s])
@@ -249,7 +248,7 @@ tab_macro, tab_safezone, tab_screener, tab_catalyst, tab_ledger = st.tabs([
     "🎯 Sniper Safe Zones", 
     "🔎 Live Screener", 
     "⚡ Catalyst Radar", 
-    "📓 Risk Desk (Ledger)"
+    "📓 Trade Book"
 ])
 
 # --- TAB 1: MACRO PLAYBOOK ---
@@ -607,7 +606,7 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: RISK DESK (LEDGER) ---
+# --- TAB 5: TRADE BOOK ---
 with tab_ledger:
     
     df_j = st.session_state.journal
@@ -619,7 +618,6 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    # Mathematical fixes: Re-tied strictly to "Open" matching to restore accurate metrics
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     
@@ -634,7 +632,6 @@ with tab_ledger:
             long_strike = float(row.get("Long Strike", 0.0))
             qty = int(row["Qty"])
             
-            # If Long Strike is logged, calculate spread width risk instead of naked risk
             if long_strike > 0:
                 capital_at_risk += abs(strike - long_strike) * 100 * qty
             else:
@@ -672,7 +669,6 @@ with tab_ledger:
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
             n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=45))
             
-            # 🚨 The Final Pro Dropdown 🚨
             n_ty = l3.selectbox("Type", [
                 "Short Put", 
                 "Put Credit Spread", 
@@ -695,7 +691,6 @@ with tab_ledger:
                     comm = round(n_qt * comm_rate, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
                     
-                    # 🚨 Completely reverted to basic 'Open / Active' per request
                     stat = "Open / Active"
                     if n_ex < datetime.now().date(): stat = "Expired (Win)"
                     
