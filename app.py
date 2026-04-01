@@ -95,8 +95,9 @@ except Exception as e:
     st.error(f"Secrets Error. Check Streamlit Settings. {e}")
     st.stop()
 
+# Adding 'Long Strike' seamlessly to support the math
 FILE_PATH = "lucky_ledger.csv"
-COLS = ["Date", "Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
+COLS = ["Date", "Ticker", "Type", "Strike", "Long Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
 def sort_ledger(df):
     if df.empty: return df
@@ -116,7 +117,11 @@ def refresh_calculations(current_df):
     if current_df.empty: return current_df
     current_df = current_df.copy()
     
-    for col in ["Strike", "Open Price", "Close Price", "Qty", "Commission"]:
+    # Ensure legacy files don't crash when missing Long Strike
+    if "Long Strike" not in current_df.columns:
+        current_df["Long Strike"] = 0.0
+        
+    for col in ["Strike", "Long Strike", "Open Price", "Close Price", "Qty", "Commission"]:
         current_df[col] = pd.to_numeric(current_df[col], errors='coerce').fillna(0)
         
     def update_row(r):
@@ -135,7 +140,11 @@ def refresh_calculations(current_df):
         elif ex_d < datetime.now().date(): 
             s = "Expired (Win)"
         else: 
-            s = "Open / Active"
+            # The Stealth Gamma Warning
+            if (ex_d - datetime.now().date()).days <= 21:
+                s = "⚠️ Gamma Risk (<21 DTE)"
+            else:
+                s = "Open / Active"
             
         return pd.Series([p, s])
         
@@ -163,6 +172,7 @@ def load_journal():
         for c in COLS:
             if c not in df.columns:
                 if c == "Date": df[c] = datetime.now().strftime("%Y-%m-%d")
+                elif c == "Long Strike": df[c] = 0.0
                 else: df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
         return refresh_calculations(df[COLS])
     except: return pd.DataFrame(columns=COLS)
@@ -173,9 +183,8 @@ if 'journal' not in st.session_state:
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
-# --- 2. GLOBAL CACHED FETCHERS (ARMORED AGAINST RATE LIMITS) ---
-
-@st.cache_data(ttl=86400) # Scrapes Wikipedia once a day for the SP500 list
+# --- 2. GLOBAL CACHED FETCHERS (ARMORED BATCH) ---
+@st.cache_data(ttl=86400) 
 def get_sp500_tickers():
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
@@ -183,7 +192,6 @@ def get_sp500_tickers():
         tickers = table['Symbol'].str.replace('.', '-').tolist()
         return tickers
     except:
-        # Failsafe list of high-beta targets if Wikipedia blocks the request
         return ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "COIN", "PLTR", "SMCI", "ARM", "MSTR", "CRWD", "AVGO", "APP"]
 
 @st.cache_data(ttl=900)
@@ -233,7 +241,6 @@ def get_options_chain(ticker_str, exp_date):
         return chain.calls, chain.puts
     except: return pd.DataFrame(), pd.DataFrame()
 
-# The New Vectorized Batch Downloader
 @st.cache_data(ttl=1800)
 def get_batch_screener_data(ticker_list):
     try:
@@ -247,7 +254,7 @@ tab_macro, tab_safezone, tab_screener, tab_catalyst, tab_ledger = st.tabs([
     "🎯 Sniper Safe Zones", 
     "🔎 Live Screener", 
     "⚡ Catalyst Radar", 
-    "📓 Lucky Ledger"
+    "📓 Risk Desk (Ledger)"
 ])
 
 # --- TAB 1: MACRO PLAYBOOK ---
@@ -310,17 +317,17 @@ with tab_macro:
         st.markdown("#### 📖 Actionable Strategy Playbook")
         
         if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
-            st.markdown("""<div class="regime-box color-crash"><div class="regime-title color-crash">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</div><div class="regime-text"><span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Selling puts here is mathematically dangerous because structural support levels will fail under panic selling. Wait for the VIX to crush back down below 25 before deploying capital.</div></div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="regime-box color-crash"><div class="regime-title color-crash">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</div><div class="regime-text"><span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Wait for the VIX to crush back down below 25 before deploying capital.</div></div>""", unsafe_allow_html=True)
         elif breadth_avg <= 20 and vix_px <= 25:
              st.markdown("""<div class="regime-box color-bullish"><div class="regime-title color-bullish">🎯 REGIME: OVERSOLD OPPORTUNITY</div><div class="regime-text"><span class="action-highlight">Your Move: BUY THE DIP (SELL PUTS).</span> This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.</div></div>""", unsafe_allow_html=True)           
         elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
-            st.markdown("""<div class="regime-box color-bearish"><div class="regime-title color-bearish">⚠️ REGIME: BEARISH / CORRECTION</div><div class="regime-text"><span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling puts on high-beta tech.</div></div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="regime-box color-bearish"><div class="regime-title color-bearish">⚠️ REGIME: BEARISH / CORRECTION</div><div class="regime-text"><span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling naked puts on high-beta tech.</div></div>""", unsafe_allow_html=True)
         elif breadth_avg >= 80:
              st.markdown("""<div class="regime-box color-overbought"><div class="regime-title color-overbought">🔥 REGIME: OVERBOUGHT / EXHAUSTED</div><div class="regime-text"><span class="action-highlight">Your Move: TAKE PROFITS.</span> Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.</div></div>""", unsafe_allow_html=True)           
         elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
             st.markdown("""<div class="regime-box color-bullish"><div class="regime-title color-bullish">🚀 REGIME: EXTREME BULLISH / RISK-ON</div><div class="regime-text"><span class="action-highlight">Your Move: STAY LONG.</span> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave.</div></div>""", unsafe_allow_html=True)
         else:
-            st.markdown("""<div class="regime-box color-neutral"><div class="regime-title color-neutral">⚖️ REGIME: NEUTRAL / RANGE-BOUND</div><div class="regime-text"><span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (Weeklies) and collect pure Theta decay on range-bound tickers.</div></div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="regime-box color-neutral"><div class="regime-title color-neutral">⚖️ REGIME: NEUTRAL / RANGE-BOUND</div><div class="regime-text"><span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (45 days) and collect pure Theta decay on range-bound tickers.</div></div>""", unsafe_allow_html=True)
 
     except Exception as e: pass
 
@@ -331,7 +338,7 @@ with tab_safezone:
     
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
-    with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=7))
+    with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=45))
     with c3:
         st.write(""); st.write("")
         run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
@@ -502,16 +509,11 @@ with tab_screener:
     if st.button("🚀 Run S&P 500 Edge Scan", use_container_width=True, type="primary", key="btn2"):
         with st.spinner("Downloading 500 stocks and calculating Implied vs Historical Volatility Edges. This usually takes 10-15 seconds..."):
             
-            # Step 1: Get the massive list dynamically
             full_watchlist = get_sp500_tickers()
-            
-            # Step 2: Batch Download Everything at once
             close_prices = get_batch_screener_data(full_watchlist)
-            
             screener_results = []
             
             if close_prices is not None and not close_prices.empty:
-                # Step 3: Run the local math loop. Blazing fast, no network calls.
                 for ticker in full_watchlist:
                     try:
                         if ticker not in close_prices.columns: continue
@@ -523,7 +525,7 @@ with tab_screener:
                         daily_returns = hist.pct_change().dropna()
                         realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
                         
-                        beta = 1.0 # Keep standard risk proxy to avoid .info ban
+                        beta = 1.0 
                         implied_vol = st.session_state.current_vix * beta
                         vrp_edge = implied_vol - realized_vol
                         
@@ -610,8 +612,19 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (LOCKED & UPDATED TOP WINNER/LOSER LOGIC) ---
+# --- TAB 5: LUCKY LEDGER (STEALTH SPREAD MATH + CLEAN GAMMA WARNING) ---
 with tab_ledger:
+    
+    df_j = st.session_state.journal
+    
+    # Check for Gamma Risk before rendering the rest of the tab
+    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
+    gamma_risk_count = len(active_df[active_df["Status"].astype(str).str.contains("Gamma", na=False)])
+    
+    # 1. The Clean "Gamma Radar" Banner (Only appears if necessary)
+    if gamma_risk_count > 0:
+        st.warning(f"⚠️ **Gamma Risk Radar:** You have **{gamma_risk_count}** open position(s) inside the 21-DTE threshold. Evaluate for roll or closure to cap tail risk.", icon="🚨")
+    
     st.markdown("""
     <div class="creed-box">
         <div class="creed-title">🧠 The Quants Creed</div>
@@ -619,33 +632,32 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    df_j = st.session_state.journal
-    
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
-    total_closed = len(realized_df)
-    wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
-    win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
-    
-    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
-    try:
-        strikes = pd.to_numeric(active_df["Strike"], errors='coerce').fillna(0)
-        qtys = pd.to_numeric(active_df["Qty"], errors='coerce').fillna(0)
-        capital_at_risk = (strikes * 100 * qtys).sum()
-    except:
-        capital_at_risk = 0.0
+    
+    # --- The Stealth Spread Math ---
+    capital_at_risk = 0.0
+    for _, row in active_df.iterrows():
+        try:
+            strike = float(row["Strike"])
+            long_strike = float(row.get("Long Strike", 0.0))
+            qty = int(row["Qty"])
+            
+            # If Long Strike is logged, calculate spread width risk instead of naked risk
+            if long_strike > 0:
+                capital_at_risk += abs(strike - long_strike) * 100 * qty
+            else:
+                capital_at_risk += strike * 100 * qty
+        except: pass
         
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
     temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
-    
-    # Isolate all trades for this week (Both Realized and Active)
     this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    # Calculate Top Winner and Loser from the ENTIRE week's pool, including Open trades
     if not this_week_df.empty and this_week_df["Premium"].max() > 0:
         top_win_idx = this_week_df["Premium"].idxmax()
         top_winner_str = f"{this_week_df.loc[top_win_idx, 'Ticker']} (+${this_week_df.loc[top_win_idx, 'Premium']:.0f})"
@@ -659,7 +671,7 @@ with tab_ledger:
         top_loser_str = "Loser: N/A"
     
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
+    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", delta_color="off")
     k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
     k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
     k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
@@ -668,26 +680,40 @@ with tab_ledger:
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3, l4 = st.columns(4)
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
-            n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=7))
-            n_ty = l3.selectbox("Type", ["Short Put", "Short Call"])
+            n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=45))
+            
+            # 🚨 The Clean Institutional Dropdown 🚨
+            n_ty = l3.selectbox("Type", [
+                "Short Put", 
+                "Put Credit Spread", 
+                "Covered Call", 
+                "Call Credit Spread"
+            ])
             n_qt = l4.number_input("Qty", value=1, min_value=1)
             
-            l5, l6 = st.columns(2)
-            n_st = l5.number_input("Strike(s)", value=None, format="%.1f", placeholder="e.g. 150.5")
-            n_op = l6.number_input("Open Price", value=None, format="%.2f", placeholder="e.g. 0.85")
+            l5, l6, l7 = st.columns(3)
+            n_st = l5.number_input("Strike (Sell)", value=None, format="%.1f", placeholder="e.g. 150.5")
+            n_ls = l6.number_input("Long Strike (Buy)", value=None, format="%.1f", placeholder="(Optional for Spreads)")
+            n_op = l7.number_input("Net Premium", value=None, format="%.2f", placeholder="e.g. 0.85")
             
             submitted = st.form_submit_button("🚀 Commit Trade", use_container_width=True, type="primary")
             
             if submitted:
                 n_tk = _raw_tk.upper() if _raw_tk else None
                 if n_tk and n_st is not None and n_op is not None:
-                    comm = round(n_qt * 1.05, 2)
+                    comm_rate = 2.10 if (n_ls is not None and n_ls > 0) else 1.05
+                    comm = round(n_qt * comm_rate, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
                     
-                    stat = "Expired (Win)" if n_ex < datetime.now().date() else "Open / Active"
+                    dte_calc = (n_ex - datetime.now().date()).days
+                    # 2. The Clean Data Table Tag
+                    stat = "⚠️ Gamma Risk (<21 DTE)" if dte_calc <= 21 else "Open / Active"
+                    if n_ex < datetime.now().date(): stat = "Expired (Win)"
+                    
                     new_row = pd.DataFrame([{
                         "Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, 
-                        "Strike": round(n_st, 1), "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
+                        "Strike": round(n_st, 1), "Long Strike": round(float(n_ls if n_ls else 0.0), 1),
+                        "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
                         "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
                     }])
                     st.session_state.journal = sort_ledger(pd.concat([df_j, new_row], ignore_index=True))
@@ -706,6 +732,7 @@ with tab_ledger:
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
+            "Long Strike": st.column_config.NumberColumn(format="%.2f"),
             "Open Price": st.column_config.NumberColumn(format="%.2f"),
             "Close Price": st.column_config.NumberColumn(format="%.2f"),
             "Commission": st.column_config.NumberColumn(format="$%.2f"),
