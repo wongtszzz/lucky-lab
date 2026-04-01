@@ -13,7 +13,7 @@ from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
 
 # --- 1. CONFIG & API ---
-st.set_page_config(page_title="Lucky Quants Lab", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Lucky Money Lab", page_icon="🧪", layout="wide")
 
 st.markdown("""
 <style>
@@ -77,7 +77,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### 🧪 Lucky Quants Lab | Pre-Market War Room")
+st.markdown("### Lucky Money Lab 🧪")
 st.divider()
 
 # API Connections
@@ -95,7 +95,7 @@ except Exception as e:
     st.error(f"Secrets Error. Check Streamlit Settings. {e}")
     st.stop()
 
-# Adding 'Long Strike' seamlessly to support the math
+# Adding 'Long Strike' seamlessly to support the math without altering Status output
 FILE_PATH = "lucky_ledger.csv"
 COLS = ["Date", "Ticker", "Type", "Strike", "Long Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
@@ -140,11 +140,8 @@ def refresh_calculations(current_df):
         elif ex_d < datetime.now().date(): 
             s = "Expired (Win)"
         else: 
-            # The Stealth Gamma Warning
-            if (ex_d - datetime.now().date()).days <= 21:
-                s = "⚠️ Gamma Risk (<21 DTE)"
-            else:
-                s = "Open / Active"
+            # Reverted strictly back to your requested original string
+            s = "Open / Active"
             
         return pd.Series([p, s])
         
@@ -612,18 +609,26 @@ with tab_catalyst:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 5: LUCKY LEDGER (STEALTH SPREAD MATH + CLEAN GAMMA WARNING) ---
+# --- TAB 5: RISK DESK (LEDGER) ---
 with tab_ledger:
     
     df_j = st.session_state.journal
     
     # Check for Gamma Risk before rendering the rest of the tab
-    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
-    gamma_risk_count = len(active_df[active_df["Status"].astype(str).str.contains("Gamma", na=False)])
+    active_for_warning = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     
     # 1. The Clean "Gamma Radar" Banner (Only appears if necessary)
+    # Using the date calculation directly so it doesn't depend on the Status string containing "Gamma"
+    gamma_risk_count = 0
+    for _, row in active_for_warning.iterrows():
+        try:
+            ex_d = pd.to_datetime(row["Expiry"]).date()
+            if (ex_d - datetime.now().date()).days <= 21:
+                gamma_risk_count += 1
+        except: pass
+        
     if gamma_risk_count > 0:
-        st.warning(f"⚠️ **Gamma Risk Radar:** You have **{gamma_risk_count}** open position(s) inside the 21-DTE threshold. Evaluate for roll or closure to cap tail risk.", icon="🚨")
+        st.warning(f"**Gamma Risk Radar:** You have **{gamma_risk_count}** open position(s) inside the 21-DTE threshold. Evaluate for roll or closure to cap tail risk.", icon="🚨")
     
     st.markdown("""
     <div class="creed-box">
@@ -634,6 +639,8 @@ with tab_ledger:
     
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
+    
+    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     
     # --- The Stealth Spread Math ---
@@ -644,7 +651,6 @@ with tab_ledger:
             long_strike = float(row.get("Long Strike", 0.0))
             qty = int(row["Qty"])
             
-            # If Long Strike is logged, calculate spread width risk instead of naked risk
             if long_strike > 0:
                 capital_at_risk += abs(strike - long_strike) * 100 * qty
             else:
@@ -682,7 +688,6 @@ with tab_ledger:
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
             n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=45))
             
-            # 🚨 The Clean Institutional Dropdown 🚨
             n_ty = l3.selectbox("Type", [
                 "Short Put", 
                 "Put Credit Spread", 
@@ -705,9 +710,7 @@ with tab_ledger:
                     comm = round(n_qt * comm_rate, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
                     
-                    dte_calc = (n_ex - datetime.now().date()).days
-                    # 2. The Clean Data Table Tag
-                    stat = "⚠️ Gamma Risk (<21 DTE)" if dte_calc <= 21 else "Open / Active"
+                    stat = "Open / Active"
                     if n_ex < datetime.now().date(): stat = "Expired (Win)"
                     
                     new_row = pd.DataFrame([{
