@@ -95,7 +95,6 @@ except Exception as e:
     st.error(f"Secrets Error. Check Streamlit Settings. {e}")
     st.stop()
 
-# Adding 'Long Strike' seamlessly to support the math without altering Status output
 FILE_PATH = "lucky_ledger.csv"
 COLS = ["Date", "Ticker", "Type", "Strike", "Long Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
@@ -117,7 +116,6 @@ def refresh_calculations(current_df):
     if current_df.empty: return current_df
     current_df = current_df.copy()
     
-    # Ensure legacy files don't crash when missing Long Strike
     if "Long Strike" not in current_df.columns:
         current_df["Long Strike"] = 0.0
         
@@ -140,7 +138,7 @@ def refresh_calculations(current_df):
         elif ex_d < datetime.now().date(): 
             s = "Expired (Win)"
         else: 
-            # Reverted strictly back to your requested original string
+            # 🚨 COMPLETELY STRIPPED OUT GAMMA LOGIC - STRICTLY OPEN / ACTIVE 🚨
             s = "Open / Active"
             
         return pd.Series([p, s])
@@ -614,22 +612,6 @@ with tab_ledger:
     
     df_j = st.session_state.journal
     
-    # Check for Gamma Risk before rendering the rest of the tab
-    active_for_warning = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
-    
-    # 1. The Clean "Gamma Radar" Banner (Only appears if necessary)
-    # Using the date calculation directly so it doesn't depend on the Status string containing "Gamma"
-    gamma_risk_count = 0
-    for _, row in active_for_warning.iterrows():
-        try:
-            ex_d = pd.to_datetime(row["Expiry"]).date()
-            if (ex_d - datetime.now().date()).days <= 21:
-                gamma_risk_count += 1
-        except: pass
-        
-    if gamma_risk_count > 0:
-        st.warning(f"**Gamma Risk Radar:** You have **{gamma_risk_count}** open position(s) inside the 21-DTE threshold. Evaluate for roll or closure to cap tail risk.", icon="🚨")
-    
     st.markdown("""
     <div class="creed-box">
         <div class="creed-title">🧠 The Quants Creed</div>
@@ -637,6 +619,7 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
+    # Mathematical fixes: Re-tied strictly to "Open" matching to restore accurate metrics
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     
@@ -651,6 +634,7 @@ with tab_ledger:
             long_strike = float(row.get("Long Strike", 0.0))
             qty = int(row["Qty"])
             
+            # If Long Strike is logged, calculate spread width risk instead of naked risk
             if long_strike > 0:
                 capital_at_risk += abs(strike - long_strike) * 100 * qty
             else:
@@ -688,6 +672,7 @@ with tab_ledger:
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
             n_ex = l2.date_input("Expiry", datetime.now().date() + timedelta(days=45))
             
+            # 🚨 The Final Pro Dropdown 🚨
             n_ty = l3.selectbox("Type", [
                 "Short Put", 
                 "Put Credit Spread", 
@@ -710,6 +695,7 @@ with tab_ledger:
                     comm = round(n_qt * comm_rate, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
                     
+                    # 🚨 Completely reverted to basic 'Open / Active' per request
                     stat = "Open / Active"
                     if n_ex < datetime.now().date(): stat = "Expired (Win)"
                     
