@@ -621,6 +621,11 @@ with tab_ledger:
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     
+    # 🚨 RESTORED WIN RATE LOGIC 🚨
+    total_closed = len(realized_df)
+    wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
+    win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
+    
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     
@@ -658,7 +663,8 @@ with tab_ledger:
         top_loser_str = "Loser: N/A"
     
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", delta_color="off")
+    # Re-added Win Rate to k1.metric
+    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
     k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
     k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
     k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
