@@ -65,15 +65,6 @@ st.markdown("""
     .target-sub { margin: 5px 0 0 0; color: #ccc; font-size: 1.1em; }
     
     .auto-risk-banner { background-color: rgba(255, 255, 255, 0.05); padding: 10px 15px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); margin-top: 10px; margin-bottom: 10px; text-align: center; }
-    
-    .catalyst-card { background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(128, 128, 128, 0.2); border-radius: 8px; padding: 20px; margin-bottom: 15px; }
-    .cat-date { color: #2962FF; font-weight: bold; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
-    .cat-title { font-size: 1.4em; font-weight: bold; margin: 5px 0 15px 0; }
-    .cat-prob-container { display: flex; align-items: center; margin-bottom: 15px; }
-    .cat-prob-text { font-size: 2em; font-weight: 900; margin-right: 15px; color: #00b09b; }
-    .cat-prob-desc { color: #ccc; font-size: 1.1em; }
-    .cat-impact { background-color: rgba(0,0,0,0.3); padding: 12px; border-radius: 5px; border-left: 3px solid #f39c12; margin-bottom: 10px; font-size: 0.95em; }
-    .cat-playbook { background-color: rgba(0,0,0,0.3); padding: 12px; border-radius: 5px; border-left: 3px solid #2962FF; font-size: 0.95em; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,17 +192,7 @@ if 'journal' not in st.session_state:
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
-# --- 2. GLOBAL CACHED FETCHERS (ARMORED BATCH) ---
-@st.cache_data(ttl=86400) 
-def get_sp500_tickers():
-    try:
-        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        table = pd.read_html(url)[0]
-        tickers = table['Symbol'].str.replace('.', '-').tolist()
-        return tickers
-    except:
-        return ["AAPL", "TSLA", "NVDA", "AMD", "META", "AMZN", "MSFT", "GOOGL", "NFLX", "JPM", "COIN", "PLTR", "SMCI", "ARM", "MSTR", "CRWD", "AVGO", "APP"]
-
+# --- 2. GLOBAL CACHED FETCHERS ---
 @st.cache_data(ttl=900)
 def get_macro_live(symbol):
     try:
@@ -259,19 +240,10 @@ def get_options_chain(ticker_str, exp_date):
         return chain.calls, chain.puts
     except: return pd.DataFrame(), pd.DataFrame()
 
-@st.cache_data(ttl=1800)
-def get_batch_screener_data(ticker_list):
-    try:
-        df = yf.download(ticker_list, period="2mo", progress=False)
-        return df['Close'] if isinstance(df.columns, pd.MultiIndex) else df
-    except: return None
-
-# --- 3. UI TABS ---
-tab_macro, tab_safezone, tab_screener, tab_catalyst, tab_ledger = st.tabs([
+# --- 3. UI TABS (CLEAN 3-TAB LAYOUT) ---
+tab_macro, tab_safezone, tab_ledger = st.tabs([
     "🌍 Macro Playbook", 
     "🎯 Sniper Safe Zones", 
-    "🔎 Live Screener", 
-    "⚡ Catalyst Radar", 
     "📓 Trade Book"
 ])
 
@@ -356,7 +328,7 @@ with tab_safezone:
     
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
-    with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=45))
+    with c2: calc_ex = st.date_input("Target Expiry (Adjust for Weeklies)", datetime.now().date() + timedelta(days=45))
     with c3:
         st.write(""); st.write("")
         run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
@@ -515,122 +487,7 @@ with tab_safezone:
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
 
-# --- TAB 3: THE OPPORTUNITY SCREENER (BATCH UPGRADE) ---
-with tab_screener:
-    st.markdown("#### 🔎 S&P 500 Live Screener (VRP Edge)")
-    st.caption("Now scanning 500 highly liquid stocks simultaneously using vectorized batch downloading.")
-    
-    col_filt1, col_filt2 = st.columns(2)
-    with col_filt1: strategy_target = st.selectbox("I want to find setups for:", ["Selling Puts (Oversold Stocks)", "Selling Calls (Overbought Stocks)"])
-    with col_filt2: min_edge = st.number_input("Minimum VRP Edge (+%)", min_value=0, max_value=50, value=10, step=5)
-        
-    if st.button("🚀 Run S&P 500 Edge Scan", use_container_width=True, type="primary", key="btn2"):
-        with st.spinner("Downloading 500 stocks and calculating Implied vs Historical Volatility Edges. This usually takes 10-15 seconds..."):
-            
-            full_watchlist = get_sp500_tickers()
-            close_prices = get_batch_screener_data(full_watchlist)
-            screener_results = []
-            
-            if close_prices is not None and not close_prices.empty:
-                for ticker in full_watchlist:
-                    try:
-                        if ticker not in close_prices.columns: continue
-                        
-                        hist = close_prices[ticker].dropna()
-                        if len(hist) < 30: continue
-                        
-                        current_price = hist.iloc[-1]
-                        daily_returns = hist.pct_change().dropna()
-                        realized_vol = daily_returns.tail(30).std() * np.sqrt(252) * 100
-                        
-                        beta = 1.0 
-                        implied_vol = st.session_state.current_vix * beta
-                        vrp_edge = implied_vol - realized_vol
-                        
-                        delta = hist.diff()
-                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                        rs = gain / loss
-                        rsi_14 = 100 - (100 / (1 + rs.iloc[-1]))
-                        
-                        screener_results.append({
-                            "Ticker": ticker, "Price": round(current_price, 2), "RSI (14)": round(rsi_14, 1),
-                            "Realized Vol": round(realized_vol, 1), "Implied Vol": round(implied_vol, 1), "VRP Edge": round(vrp_edge, 1)
-                        })
-                    except: pass 
-            
-            res_df = pd.DataFrame(screener_results)
-            if not res_df.empty:
-                if strategy_target == "Selling Puts (Oversold Stocks)":
-                    filtered_df = res_df[(res_df["RSI (14)"] < 45) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
-                    st.success(f"Found {len(filtered_df)} candidates.")
-                else:
-                    filtered_df = res_df[(res_df["RSI (14)"] > 60) & (res_df["VRP Edge"] >= min_edge)].sort_values(by="VRP Edge", ascending=False) 
-                    st.error(f"Found {len(filtered_df)} candidates.")
-                    
-                if not filtered_df.empty:
-                    st.dataframe(filtered_df.style.format({"Price": "${:.2f}", "RSI (14)": "{:.1f}", "Realized Vol": "{:.1f}%", "Implied Vol": "{:.1f}%", "VRP Edge": "+{:.1f}%"}), use_container_width=True, hide_index=True)
-            else:
-                st.warning("Failed to download batch data. Yahoo Finance might be temporarily down.")
-
-# --- TAB 4: CATALYST RADAR ---
-with tab_catalyst:
-    st.markdown("#### ⚡ Event-Driven Catalyst Radar")
-    st.caption("Front-run market volatility by tracking prediction market probabilities for major economic events.")
-    
-    @st.cache_data(ttl=3600)
-    def get_prediction_data():
-        try:
-            kalshi_key = st.secrets.get("KALSHI_KEY", None)
-            if kalshi_key: pass 
-        except: pass
-        
-        return [
-            {
-                "date": "Next Wed, 8:30 AM EST",
-                "title": "US CPI Inflation (YoY)",
-                "outcome": "Will CPI come in above 2.8%?",
-                "prob": 64,
-                "impact": "If Hot (>2.8%): DXY Spikes, Tech (QQQ) Drops. Rates stay higher for longer.",
-                "playbook": "Avoid selling naked puts on Tech. Shift to Call Credit Spreads on overbought growth stocks."
-            },
-            {
-                "date": "Next Fri, 8:30 AM EST",
-                "title": "Non-Farm Payrolls (Jobs)",
-                "outcome": "Will US add >180k jobs?",
-                "prob": 82,
-                "impact": "If Strong (>180k): Goldilocks scenario confirmed. Consumer spending remains robust.",
-                "playbook": "Aggressively sell Puts on high-quality Mega-Caps (AAPL, AMZN). Market will reward economic resilience."
-            },
-            {
-                "date": "Upcoming FOMC",
-                "title": "Federal Reserve Rate Decision",
-                "outcome": "Will the Fed cut rates by 25bps?",
-                "prob": 22,
-                "impact": "If No Cut (Hold): Small initial shock to small-caps (IWM), but large-caps will absorb it.",
-                "playbook": "Wait for the post-meeting press conference (Powell). Sell Iron Condors to capture the 'IV Crush' immediately after he speaks."
-            }
-        ]
-        
-    events = get_prediction_data()
-    st.info("💡 **Quant Tip:** When an event has a very high probability (e.g., 85%+), the market has usually already priced it in. The edge is found when the options market is pricing in a massive crash (high VIX), but the prediction markets show the event is likely a 'nothing-burger.'")
-    st.write("---")
-    
-    for idx, ev in enumerate(events):
-        st.markdown(f"""
-        <div class="catalyst-card">
-            <div class="cat-date">📅 {ev['date']}</div>
-            <div class="cat-title">{ev['title']}</div>
-            <div class="cat-prob-container">
-                <div class="cat-prob-text">{ev['prob']}%</div>
-                <div class="cat-prob-desc">Crowd Probability: <b>{ev['outcome']}</b></div>
-            </div>
-            <div class="cat-impact"><b>Market Impact:</b> {ev['impact']}</div>
-            <div class="cat-playbook"><b>Options Playbook:</b> {ev['playbook']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-# --- TAB 5: TRADE BOOK ---
+# --- TAB 3: TRADE BOOK ---
 with tab_ledger:
     
     df_j = st.session_state.journal
@@ -638,7 +495,7 @@ with tab_ledger:
     st.markdown("""
     <div class="creed-box">
         <div class="creed-title">🧠 The Quants Creed</div>
-        <div class="creed-text"><b>1. Hope is not a strategy.</b> Cut your losses mechanically.<br><b>2. Watch the clock.</b> Beware of Market-on-Close (MOC) volatility and the notorious Friday Flush.</div>
+        <div class="creed-text"><b>1. Small Size, High Occurrence.</b> You manage risk through size, not just strike selection.<br><b>2. Cut the 45-DTEs at 21 days.</b> Gamma will destroy your theta gains if you hold to expiration.</div>
     </div>
     """, unsafe_allow_html=True)
     
