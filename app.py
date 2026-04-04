@@ -112,6 +112,7 @@ def sort_ledger(df):
     df['Date'] = df['temp_date'].dt.strftime('%Y-%m-%d')
     return df.drop(columns=['temp_date', 'status_rank']).reset_index(drop=True)
 
+# 🚨 THE BULLETPROOF CALCULATION ENGINE 🚨
 def refresh_calculations(current_df):
     if current_df.empty: return current_df
     current_df = current_df.copy()
@@ -127,19 +128,22 @@ def refresh_calculations(current_df):
         close_p = float(r["Close Price"]) if pd.notna(r["Close Price"]) else 0.0
         qty = int(r["Qty"]) if pd.notna(r["Qty"]) else 1
         comm = float(r["Commission"]) if pd.notna(r["Commission"]) else 0.0
+        current_status = str(r.get("Status", "Open / Active"))
         
         p = round(((open_p - close_p) * 100 * qty) - comm, 2)
         
         try: ex_d = pd.to_datetime(r["Expiry"]).date()
         except: ex_d = datetime.now().date()
         
+        # Rule 1: If a Close Price exists, the math dictates it's Closed.
         if close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
-        elif ex_d < datetime.now().date(): 
-            # 🚨 Auto-Expire Logic RESTORED 🚨
+        # Rule 2: If it's currently marked as Open, AND the expiry date has passed, Auto-Expire it.
+        elif "Open" in current_status and ex_d < datetime.now().date(): 
             s = "Expired (Win)"
+        # Rule 3: Otherwise, strictly respect the current status so manual edits aren't destroyed.
         else: 
-            s = "Open / Active"
+            s = current_status if current_status.strip() != "nan" and current_status.strip() != "" else "Open / Active"
             
         return pd.Series([p, s])
         
@@ -159,6 +163,7 @@ def save_journal(df):
         st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except: pass
 
+# 🚨 THE AUTO-SWEEP PROTOCOL 🚨
 def load_journal():
     try:
         contents = repo.get_contents(FILE_PATH)
@@ -171,21 +176,20 @@ def load_journal():
                 elif c == "Long Strike": raw_df[c] = 0.0
                 else: raw_df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
         
-        # Track how many open trades existed BEFORE calculations
+        # Count open trades before math
         original_open = len(raw_df[raw_df['Status'].astype(str).str.contains('Open', na=False)])
         
         refreshed_df = refresh_calculations(raw_df[COLS])
         
-        # Track how many open trades exist AFTER calculations (did any expire?)
+        # Count open trades after math
         new_open = len(refreshed_df[refreshed_df['Status'].astype(str).str.contains('Open', na=False)])
         
-        # 🚨 The Trigger: If an open trade vanished, it means it auto-expired. We need to save.
+        # If open trades vanished, the auto-expire triggered. Flag it for a permanent save.
         needs_auto_save = original_open > new_open 
         
         return refreshed_df, needs_auto_save
     except: return pd.DataFrame(columns=COLS), False
 
-# --- STATE INITIALIZATION & THE AUTO-SWEEP EXECUTION ---
 if 'journal' not in st.session_state: 
     loaded_df, needs_auto_save = load_journal()
     st.session_state.journal = loaded_df
@@ -193,7 +197,7 @@ if 'journal' not in st.session_state:
     
     if needs_auto_save:
         save_journal(st.session_state.journal)
-        st.toast("🧹 Auto-Sweep: Expired trades permanently moved to Realized P&L and synced to GitHub.", icon="✅")
+        st.toast("🧹 Auto-Sweep: Passed expiration dates detected. Trades marked as Expired and permanently moved to Realized P&L.", icon="✅")
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
