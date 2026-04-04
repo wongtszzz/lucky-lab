@@ -136,6 +136,7 @@ def refresh_calculations(current_df):
         if close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
         elif ex_d < datetime.now().date(): 
+            # 🚨 Auto-Expire Logic RESTORED 🚨
             s = "Expired (Win)"
         else: 
             s = "Open / Active"
@@ -162,18 +163,37 @@ def load_journal():
     try:
         contents = repo.get_contents(FILE_PATH)
         decoded_content = base64.b64decode(contents.content).decode('utf-8')
-        df = pd.read_csv(io.StringIO(decoded_content))
+        raw_df = pd.read_csv(io.StringIO(decoded_content))
+        
         for c in COLS:
-            if c not in df.columns:
-                if c == "Date": df[c] = datetime.now().strftime("%Y-%m-%d")
-                elif c == "Long Strike": df[c] = 0.0
-                else: df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
-        return refresh_calculations(df[COLS])
-    except: return pd.DataFrame(columns=COLS)
+            if c not in raw_df.columns:
+                if c == "Date": raw_df[c] = datetime.now().strftime("%Y-%m-%d")
+                elif c == "Long Strike": raw_df[c] = 0.0
+                else: raw_df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
+        
+        # Track how many open trades existed BEFORE calculations
+        original_open = len(raw_df[raw_df['Status'].astype(str).str.contains('Open', na=False)])
+        
+        refreshed_df = refresh_calculations(raw_df[COLS])
+        
+        # Track how many open trades exist AFTER calculations (did any expire?)
+        new_open = len(refreshed_df[refreshed_df['Status'].astype(str).str.contains('Open', na=False)])
+        
+        # 🚨 The Trigger: If an open trade vanished, it means it auto-expired. We need to save.
+        needs_auto_save = original_open > new_open 
+        
+        return refreshed_df, needs_auto_save
+    except: return pd.DataFrame(columns=COLS), False
 
+# --- STATE INITIALIZATION & THE AUTO-SWEEP EXECUTION ---
 if 'journal' not in st.session_state: 
-    st.session_state.journal = load_journal()
+    loaded_df, needs_auto_save = load_journal()
+    st.session_state.journal = loaded_df
     st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    if needs_auto_save:
+        save_journal(st.session_state.journal)
+        st.toast("🧹 Auto-Sweep: Expired trades permanently moved to Realized P&L and synced to GitHub.", icon="✅")
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
@@ -621,7 +641,6 @@ with tab_ledger:
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     
-    # 🚨 RESTORED WIN RATE LOGIC 🚨
     total_closed = len(realized_df)
     wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
     win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
@@ -663,7 +682,6 @@ with tab_ledger:
         top_loser_str = "Loser: N/A"
     
     k1, k2, k3, k4 = st.columns(4)
-    # Re-added Win Rate to k1.metric
     k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
     k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
     k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
