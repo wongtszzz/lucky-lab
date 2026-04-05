@@ -103,7 +103,6 @@ def sort_ledger(df):
     df['Date'] = df['temp_date'].dt.strftime('%Y-%m-%d')
     return df.drop(columns=['temp_date', 'status_rank']).reset_index(drop=True)
 
-# 🚨 THE BULLETPROOF CALCULATION ENGINE 🚨
 def refresh_calculations(current_df):
     if current_df.empty: return current_df
     current_df = current_df.copy()
@@ -126,13 +125,10 @@ def refresh_calculations(current_df):
         try: ex_d = pd.to_datetime(r["Expiry"]).date()
         except: ex_d = datetime.now().date()
         
-        # Rule 1: If a Close Price exists, the math dictates it's Closed.
         if close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
-        # Rule 2: If it's currently marked as Open, AND the expiry date has passed, Auto-Expire it.
         elif "Open" in current_status and ex_d < datetime.now().date(): 
             s = "Expired (Win)"
-        # Rule 3: Otherwise, strictly respect the current status so manual edits aren't destroyed.
         else: 
             s = current_status if current_status.strip() != "nan" and current_status.strip() != "" else "Open / Active"
             
@@ -154,7 +150,6 @@ def save_journal(df):
         st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except: pass
 
-# 🚨 THE AUTO-SWEEP PROTOCOL 🚨
 def load_journal():
     try:
         contents = repo.get_contents(FILE_PATH)
@@ -167,15 +162,9 @@ def load_journal():
                 elif c == "Long Strike": raw_df[c] = 0.0
                 else: raw_df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
         
-        # Count open trades before math
         original_open = len(raw_df[raw_df['Status'].astype(str).str.contains('Open', na=False)])
-        
         refreshed_df = refresh_calculations(raw_df[COLS])
-        
-        # Count open trades after math
         new_open = len(refreshed_df[refreshed_df['Status'].astype(str).str.contains('Open', na=False)])
-        
-        # If open trades vanished, the auto-expire triggered. Flag it for a permanent save.
         needs_auto_save = original_open > new_open 
         
         return refreshed_df, needs_auto_save
@@ -240,7 +229,7 @@ def get_options_chain(ticker_str, exp_date):
         return chain.calls, chain.puts
     except: return pd.DataFrame(), pd.DataFrame()
 
-# --- 3. UI TABS (CLEAN 3-TAB LAYOUT) ---
+# --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_ledger = st.tabs([
     "🌍 Macro Playbook", 
     "🎯 Sniper Safe Zones", 
@@ -323,23 +312,29 @@ with tab_macro:
 
 # --- TAB 2: SNIPER SAFE ZONES ---
 with tab_safezone:
-    st.markdown("#### 🎯 Sniper Safe Zones (100% Automated)")
-    st.caption("Zero inputs. The app calculates RSI, assigns Risk Multipliers, and executes a 'Proximity Snap' to find the closest safe structural wall.")
+    st.markdown("#### 🎯 Sniper Safe Zones")
+    
+    # 🚨 Dynamic Risk Shield Toggle 🚨
+    c_tog1, c_tog2 = st.columns([3, 1])
+    with c_tog1:
+        st.caption("Enter ticker and expiry to calculate structural support. Matrix will load below.")
+    with c_tog2:
+        dynamic_risk = st.checkbox("🛡️ Enable RSI Risk Shield", value=False, help="When checked, modifies risk multiplier based on Oversold/Overbought conditions. Leave unchecked to lock multiplier at 1.0 (Rigid/Riskier).")
     
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
-    with c2: calc_ex = st.date_input("Target Expiry (Adjust for Weeklies)", datetime.now().date() + timedelta(days=45))
+    with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=45))
     with c3:
         st.write(""); st.write("")
         run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
     
     if run_calc:
-        with st.spinner(f"Running automated X-Ray analysis on {calc_tk}..."):
+        with st.spinner(f"Running automated X-Ray and fetching Options Matrix for {calc_tk}..."):
             try:
                 hist_1y, avail_exps = get_sniper_history(calc_tk)
                 
                 if hist_1y.empty:
-                    st.error(f"Invalid Ticker or No Data Found for {calc_tk}. Please check spelling or wait for API limits to reset.")
+                    st.error(f"Invalid Ticker or No Data Found for {calc_tk}.")
                 else:
                     px = float(hist_1y['Close'].iloc[-1])
                     beta = 1.0 
@@ -354,38 +349,45 @@ with tab_safezone:
                         if pd.isna(live_rsi): live_rsi = 50.0
                     except: live_rsi = 50.0
                     
-                    if live_rsi < 40:
-                        put_mult, call_mult = 0.5, 1.5
-                        risk_status = f"OVERSOLD (RSI: {live_rsi:.1f}). Auto-Aggressive on Puts (0.5x), Conservative on Calls (1.5x)."
-                    elif live_rsi > 60:
-                        put_mult, call_mult = 1.5, 0.5
-                        risk_status = f"OVERBOUGHT (RSI: {live_rsi:.1f}). Auto-Conservative on Puts (1.5x), Aggressive on Calls (0.5x)."
+                    # 🚨 Respecting the User's Choice for Multiplier 🚨
+                    if dynamic_risk:
+                        if live_rsi < 40:
+                            put_mult, call_mult = 0.5, 1.5
+                            risk_status = f"🛡️ Shield ACTIVE: OVERSOLD (RSI: {live_rsi:.1f}). Put Risk Skew: 0.5x."
+                        elif live_rsi > 60:
+                            put_mult, call_mult = 1.5, 0.5
+                            risk_status = f"🛡️ Shield ACTIVE: OVERBOUGHT (RSI: {live_rsi:.1f}). Put Risk Skew: 1.5x."
+                        else:
+                            put_mult, call_mult = 1.0, 1.0
+                            risk_status = f"🛡️ Shield ACTIVE: NEUTRAL (RSI: {live_rsi:.1f}). Risk Skew: 1.0x."
                     else:
                         put_mult, call_mult = 1.0, 1.0
-                        risk_status = f"NEUTRAL (RSI: {live_rsi:.1f}). Balanced Risk Applied (1.0x move)."
+                        risk_status = f"⚠️ Shield OFF: Rigid 1.0x Multiplier applied regardless of RSI ({live_rsi:.1f})."
 
-                    st.markdown(f"<div class='auto-risk-banner'>🤖 <b>Auto-Risk Engine Active:</b> {risk_status}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='auto-risk-banner'>🤖 <b>Risk Engine:</b> {risk_status}</div>", unsafe_allow_html=True)
                     
                     put_wall_str, call_wall_str = "N/A", "N/A"
                     put_wall, call_wall = None, None
                     base_exp_move = 0.0
                     math_type_str = "Theoretical IV"
                     
+                    calls_data, puts_data = pd.DataFrame(), pd.DataFrame()
+                    
                     try:
                         if avail_exps:
                             target_exp = calc_ex.strftime('%Y-%m-%d')
                             if target_exp not in avail_exps: target_exp = avail_exps[0]
                             
-                            calls, puts = get_options_chain(calc_tk, target_exp)
+                            calls_data, puts_data = get_options_chain(calc_tk, target_exp)
                             
-                            if not calls.empty and not puts.empty:
-                                closest_call = calls.iloc[(calls['strike'] - px).abs().argsort()[:1]]
-                                closest_put = puts.iloc[(puts['strike'] - px).abs().argsort()[:1]]
+                            if not calls_data.empty and not puts_data.empty:
+                                closest_call = calls_data.iloc[(calls_data['strike'] - px).abs().argsort()[:1]]
+                                closest_put = puts_data.iloc[(puts_data['strike'] - px).abs().argsort()[:1]]
                                 base_exp_move = float(closest_call['lastPrice'].values[0] + closest_put['lastPrice'].values[0])
                                 math_type_str = "Market Maker Straddle"
                                 
-                                puts_filtered = puts[(puts['strike'] >= px * 0.70) & (puts['strike'] <= px)]
-                                calls_filtered = calls[(calls['strike'] <= px * 1.30) & (calls['strike'] >= px)]
+                                puts_filtered = puts_data[(puts_data['strike'] >= px * 0.70) & (puts_data['strike'] <= px)]
+                                calls_filtered = calls_data[(calls_data['strike'] <= px * 1.30) & (calls_data['strike'] >= px)]
                                 if not puts_filtered.empty:
                                     put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
                                     put_wall_str = f"${put_wall:.2f}"
@@ -430,20 +432,6 @@ with tab_safezone:
                         target_put = math_floor
                         put_subtext = f"Using Auto-Math Floor. Structural supports are too far away to justify sacrificing your premium."
 
-                    call_candidates = []
-                    if r1 - math_ceil >= 0 and (r1 - math_ceil) <= snap_limit: call_candidates.append((f"R1 ({lookback_days}d High)", r1))
-                    if r2 - math_ceil >= 0 and (r2 - math_ceil) <= snap_limit: call_candidates.append((f"R2 ({macro_lookback}d High)", r2))
-                    if poc_price - math_ceil >= 0 and (poc_price - math_ceil) <= snap_limit: call_candidates.append(("Volume POC", poc_price))
-                    if call_wall is not None and call_wall - math_ceil >= 0 and (call_wall - math_ceil) <= snap_limit: call_candidates.append(("Options Call Wall", call_wall))
-                    
-                    if call_candidates:
-                        best_call = min(call_candidates, key=lambda x: x[1])
-                        target_call = best_call[1]
-                        call_subtext = f"Snapped to {best_call[0]} at ${target_call:.2f}. Blocked safely by structure, just above the Math Ceiling (${math_ceil:.2f})."
-                    else:
-                        target_call = math_ceil
-                        call_subtext = f"Using Auto-Math Ceiling. Structural resistance is too far away to justify sacrificing your premium."
-
                     st.write("---")
                     st.markdown(f"### **{calc_tk} X-Ray Analysis | Current Price: ${px:.2f}**")
                     
@@ -480,9 +468,41 @@ with tab_safezone:
                             </div>""", unsafe_allow_html=True)
                     
                     st.write("---")
-                    st.markdown("#### 🎯 Ultimate Target Strikes")
-                    st.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00b09b;">🟢 TARGET PUT STRIKE: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
-                    st.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL STRIKE: ${target_call:.2f}</div><div class="target-sub">{call_subtext}</div></div>""", unsafe_allow_html=True)
+                    st.markdown("#### 🎯 Target Strikes")
+                    c_tgt1, c_tgt2 = st.columns(2)
+                    c_tgt1.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00b09b;">🟢 TARGET PUT: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
+                    # Just establishing ceiling target for visual symmetry
+                    c_tgt2.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL: ${math_ceil:.2f}</div><div class="target-sub">Auto-Ceiling</div></div>""", unsafe_allow_html=True)
+
+                    # 🚨 THE LIVE PREMIUM MATRIX 🚨
+                    if not puts_data.empty:
+                        st.write("---")
+                        st.markdown("#### 🛒 Live Premium Matrix (Puts)")
+                        st.caption("Check the 'Bid' and 'Ask' closely. If the spread is wide (e.g. Bid $0.10, Ask $1.00), do NOT trade it. Slippage will kill you.")
+                        
+                        # Filter puts to show strikes below current price
+                        display_puts = puts_data[(puts_data['strike'] <= px) & (puts_data['strike'] > px * 0.6)].copy()
+                        
+                        if not display_puts.empty:
+                            display_puts['Distance %'] = ((px - display_puts['strike']) / px) * 100
+                            display_puts['Mid'] = (display_puts['bid'] + display_puts['ask']) / 2
+                            display_puts = display_puts.sort_values(by='strike', ascending=False)
+                            
+                            matrix_df = display_puts[['strike', 'Distance %', 'bid', 'ask', 'Mid', 'openInterest']]
+                            matrix_df.columns = ['Strike', 'Distance (%)', 'Bid', 'Ask', 'Mid Premium', 'Open Interest']
+                            
+                            st.dataframe(matrix_df.style.format({
+                                'Strike': '${:.2f}', 
+                                'Distance (%)': '{:.1f}%', 
+                                'Bid': '${:.2f}', 
+                                'Ask': '${:.2f}', 
+                                'Mid Premium': '${:.2f}',
+                                'Open Interest': '{:,.0f}'
+                            }).highlight_max(subset=['Open Interest'], color='rgba(0,176,155,0.2)'), use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("No relevant strikes found below current price.")
+                    else:
+                        st.warning("Could not fetch Live Premium Matrix. Exchange data may be unavailable.")
 
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
@@ -495,7 +515,16 @@ with tab_ledger:
     st.markdown("""
     <div class="creed-box">
         <div class="creed-title">🧠 The Quants Creed</div>
-        <div class="creed-text"><b>1. Small Size, High Occurrence.</b> You manage risk through size, not just strike selection.<br><b>2. Cut the 45-DTEs at 21 days.</b> Gamma will destroy your theta gains if you hold to expiration.</div>
+        <div class="creed-text">
+            <b>3 Emergency Protocols - when the market goes against you:</b><br>
+            <b>Cut:</b> Take the 200% - 300% mechanical loss. No hesitation.<br>
+            <b>Roll:</b> Roll out in time, but only for a net credit.<br>
+            <b>Hold:</b> Best is to wait it out and accept you could lose the entire (spread - premium).<br><br>
+            <b>The 45-DTE Golden Rules:</b><br>
+            🎯 Close trades when hitting 60% - 75% profit.<br>
+            ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE)<br>
+            ⚠️ Do not hold into the final 20 days — Gamma risk will destroy your steady Theta gains.
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
