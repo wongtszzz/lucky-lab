@@ -522,7 +522,7 @@ with tab_ledger:
             <b>Hold:</b> Best is to wait it out and accept you could lose the entire (spread - premium).<br><br>
             <b>The 45-DTE Golden Rules:</b><br>
             🎯 Close trades when hitting 60% - 75% profit.<br>
-            ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE)<br>
+            ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE).<br>
             ⚠️ Do not hold into the final 20 days — Gamma risk will destroy your steady Theta gains.
         </div>
     </div>
