@@ -1,7 +1,7 @@
 Date,Ticker,Type,Strike,Long Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-04-09,TSM,Short Put,335.0,0.0,2026-04-10,0.18,0.0,3,2.1,51.9,Open / Active
 2026-04-08,TSM,Short Put,340.0,0.0,2026-04-10,0.6,0.0,1,1.54,58.46,Open / Active
-2026-04-08,GLD,Covered Call,442.0,0.0,2026-04-10,3.7,0.3,1,1.06,338.94,Closed (Win)
+2026-04-08,GLD,Covered Call,442.0,0.0,2026-04-10,3.7,0.3,1,1.86,338.14,Closed (Win)
 2026-04-07,ASML,Short Put,990.0,0.0,2026-05-22,13.8,0.0,1,0.08,1379.92,Open / Active
 2026-04-07,NVDA,Short Put,145.0,0.0,2026-05-22,1.91,0.0,1,0.64,190.36,Open / Active
 2026-04-07,MU,Short Put,270.0,0.0,2026-05-22,5.65,0.0,1,1.06,563.94,Open / Active
