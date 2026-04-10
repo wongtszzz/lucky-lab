@@ -270,14 +270,27 @@ with tab_macro:
 
         st.write("---")
         
-        # 🚨 NEW AI CHIEF ECONOMIST ENGINE 🚨
+        # 🚨 NEW AI CHIEF ECONOMIST ENGINE (SELF-HEALING) 🚨
         st.markdown("#### 🧠 AI Chief Economist Brief")
         
         @st.cache_data(ttl=3600) # Caches the AI report for 1 hour to save API calls
         def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                model = genai.GenerativeModel('gemini-pro')
+                
+                # 1. Self-Healing Engine: Dynamically find an approved model
+                valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                if not valid_models:
+                    return "⚠️ **Error:** API key connected, but Google returned 0 available generative models."
+                    
+                # Prefer the newest "flash" models for speed, fallback to whatever is first on the list
+                target_model = next((m for m in valid_models if 'flash' in m), valid_models[0])
+                
+                # 2. Call the dynamically validated model
+                model = genai.GenerativeModel(target_model)
+                
+                # 3. Give it the Chief Economist instructions
                 prompt = f"""
                 You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
                 Write a morning macro brief based strictly on these live numbers:
@@ -298,11 +311,12 @@ with tab_macro:
                 (Give specific tactical advice. Should we sell 45-DTE Puts? Switch to Call Credit Spreads? Avoid weeklies? Be definitive).
                 """
                 
+                # 4. Generate the live report
                 response = model.generate_content(prompt)
                 return response.text
                 
             except Exception as e:
-                return f"⚠️ **AI Engine Offline.** Check API Key or Rate Limits. Error details: {e}"
+                return f"⚠️ **AI Engine Offline.** Error details: {e}"
 
         with st.spinner("Chief Economist is analyzing the live data..."):
             ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, breadth_avg)
