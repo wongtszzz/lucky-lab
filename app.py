@@ -277,7 +277,7 @@ with tab_macro:
         def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-pro')
                 prompt = f"""
                 You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
                 Write a morning macro brief based strictly on these live numbers:
