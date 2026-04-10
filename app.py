@@ -11,6 +11,7 @@ from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, St
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
+import google.generativeai as genai
 
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Money Lab", page_icon="🧪", layout="wide")
@@ -39,17 +40,6 @@ st.markdown("""
     .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
     .creed-text { font-size: 0.95em; line-height: 1.6; }
     
-    .regime-box { background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(128, 128, 128, 0.1); border-left: 6px solid; border-radius: 8px; padding: 20px; margin-top: 10px; margin-bottom: 25px; color: #eee; }
-    .regime-title { font-weight: 800; font-size: 1.3em; margin-bottom: 10px; margin-top:0; letter-spacing: 0.5px; }
-    .regime-text { font-size: 0.95em; line-height: 1.6; }
-    .action-highlight { font-weight: bold; }
-
-    .color-crash { color: #b91d47; border-left-color: #b91d47; }
-    .color-bearish { color: #e67e22; border-left-color: #e67e22; }
-    .color-bullish { color: #00b09b; border-left-color: #00b09b; }
-    .color-neutral { color: #3a7bd5; border-left-color: #3a7bd5; }
-    .color-overbought { color: #8e44ad; border-left-color: #8e44ad; }
-    
     .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
     .sniper-title { font-size: 0.85em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
     .sniper-value { font-size: 1.8em; font-weight: bold; }
@@ -57,7 +47,8 @@ st.markdown("""
     .call-color { color: #ff4b4b; }
     .neutral-color { color: #f39c12; }
     
-    .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 15px; border-radius: 5px; margin-bottom: 20px;}
+    .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 20px; border-radius: 5px; margin-bottom: 20px;}
+    .synthesis-box h3 { margin-top: 0; font-size: 1.2em; color: #2962FF; }
     
     .target-box-put { background-color: rgba(0, 176, 155, 0.1); border-left: 5px solid #00b09b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
     .target-box-call { background-color: rgba(255, 75, 75, 0.1); border-left: 5px solid #ff4b4b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
@@ -245,6 +236,8 @@ with tab_macro:
         if st.button("🔄 Refresh Data", use_container_width=True, key="ref1"):
             st.cache_data.clear()
             st.rerun()
+            
+    st.caption(f"Last API Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (Pulls fresh data every 15 mins or on manual refresh)")
     
     try:
         oil_px, oil_pct = get_macro_live("CL=F")
@@ -277,36 +270,48 @@ with tab_macro:
 
         st.write("---")
         
-        st.markdown("#### 🧠 Live Market Synthesis")
-        syn_oil = "Energy prices are running hot, putting upward pressure on inflation and acting as a headwind for rate cuts." if oil_px > 85 else "Crude oil remains contained, alleviating inflation fears and supporting risk assets."
-        syn_dxy = "The US Dollar is showing strength, tightening global liquidity and pressuring multinational tech earnings." if dxy_px > 105 else "A weaker dollar is currently providing a highly favorable liquidity environment for equities."
-        syn_vix = "However, the VIX is elevated, indicating institutional funds are actively buying downside protection. Fear is present in the order book." if vix_px > 25 else "Volatility is crushed, showing market complacency and a clear 'risk-on' environment."
+        # 🚨 NEW AI CHIEF ECONOMIST ENGINE 🚨
+        st.markdown("#### 🧠 AI Chief Economist Brief")
         
-        if breadth_avg >= 80: syn_brd = "Under the hood, participation is exceptionally strong (Overbought). The rally is mathematically exhausted and highly vulnerable to a sudden pullback."
-        elif breadth_avg <= 20: syn_brd = "Market breadth is severely washed out (Oversold), BUT the VIX indicates pure panic. This is capitulation, not a safe entry." if vix_px > 30 else "Market breadth is severely washed out (Oversold) while fear (VIX) remains contained, creating a rare structural buying opportunity."
-        else: syn_brd = "Market breadth is healthy and neutral, showing a standard rotation of capital between sectors."
+        @st.cache_data(ttl=3600) # Caches the AI report for 1 hour to save API calls
+        def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
+            try:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt = f"""
+                You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
+                Write a morning macro brief based strictly on these live numbers:
+                - VIX: {vix:.2f}
+                - DXY (US Dollar): {dxy:.2f}
+                - WTI Crude Oil: ${oil:.2f}
+                - Market Breadth: {breadth_avg:.0f}% of stocks trending up.
+                
+                Format your response in exactly 3 short, punchy sections using Markdown. Do not use filler words.
+                
+                ### 🌍 The Current Regime
+                (Synthesize what these specific metrics mean together right now. Identify if it is risk-on, risk-off, a divergent top, or oversold capitulation).
+                
+                ### 📰 The Forward Look
+                (Based on these metrics, what macroeconomic themes or breaking points should the desk watch out for in the coming days).
+                
+                ### 🎯 Option Seller Action Plan
+                (Give specific tactical advice. Should we sell 45-DTE Puts? Switch to Call Credit Spreads? Avoid weeklies? Be definitive).
+                """
+                
+                response = model.generate_content(prompt)
+                return response.text
+                
+            except Exception as e:
+                return f"⚠️ **AI Engine Offline.** Check API Key or Rate Limits. Error details: {e}"
 
+        with st.spinner("Chief Economist is analyzing the live data..."):
+            ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, breadth_avg)
+            
         st.markdown(f"""
         <div class="synthesis-box">
-            <b>Current Conditions:</b> {syn_oil} {syn_dxy} {syn_vix} <br><br>
-            <b>Internal Health:</b> {syn_brd}
+            {ai_brief}
         </div>
         """, unsafe_allow_html=True)
-
-        st.markdown("#### 📖 Actionable Strategy Playbook")
-        
-        if vix_px > 30 or (dxy_px > 108 and oil_px > 95):
-            st.markdown("""<div class="regime-box color-crash"><div class="regime-title color-crash">🚨 REGIME: CRASHING / LIQUIDITY SQUEEZE</div><div class="regime-text"><span class="action-highlight">Your Move: HOLD CASH.</span> Do not catch falling knives. Wait for the VIX to crush back down below 25 before deploying capital.</div></div>""", unsafe_allow_html=True)
-        elif breadth_avg <= 20 and vix_px <= 25:
-             st.markdown("""<div class="regime-box color-bullish"><div class="regime-title color-bullish">🎯 REGIME: OVERSOLD OPPORTUNITY</div><div class="regime-text"><span class="action-highlight">Your Move: BUY THE DIP (SELL PUTS).</span> This is the optimal time for premium sellers. Use the Screener to find high VIX-Edge tech stocks and sell Cash-Secured Puts at major structural support lines.</div></div>""", unsafe_allow_html=True)           
-        elif vix_px > 22 or dxy_px > 105 or oil_px > 85:
-            st.markdown("""<div class="regime-box color-bearish"><div class="regime-title color-bearish">⚠️ REGIME: BEARISH / CORRECTION</div><div class="regime-text"><span class="action-highlight">Your Move: BE DEFENSIVE.</span> Rotate focus to Traditional and Energy stocks. Capitalize on the downside by selling Call Credit Spreads or Covered Calls on existing positions. Avoid selling naked puts on high-beta tech.</div></div>""", unsafe_allow_html=True)
-        elif breadth_avg >= 80:
-             st.markdown("""<div class="regime-box color-overbought"><div class="regime-title color-overbought">🔥 REGIME: OVERBOUGHT / EXHAUSTED</div><div class="regime-text"><span class="action-highlight">Your Move: TAKE PROFITS.</span> Stop selling puts. This is the absolute best time to sell Covered Calls to collect rich premiums from overly greedy buyers before the inevitable dip.</div></div>""", unsafe_allow_html=True)           
-        elif vix_px < 18 and dxy_px < 103 and oil_px < 78:
-            st.markdown("""<div class="regime-box color-bullish"><div class="regime-title color-bullish">🚀 REGIME: EXTREME BULLISH / RISK-ON</div><div class="regime-text"><span class="action-highlight">Your Move: STAY LONG.</span> Heavy on Tech and Growth. Sell OTM Puts on your high-beta Watchlist. Ride the liquidity wave.</div></div>""", unsafe_allow_html=True)
-        else:
-            st.markdown("""<div class="regime-box color-neutral"><div class="regime-title color-neutral">⚖️ REGIME: NEUTRAL / RANGE-BOUND</div><div class="regime-text"><span class="action-highlight">Your Move: STOCK PICKER'S MARKET.</span> Use your Screener to find specific exhausted stocks. Keep trade durations short (45 days) and collect pure Theta decay on range-bound tickers.</div></div>""", unsafe_allow_html=True)
 
     except Exception as e: pass
 
@@ -314,7 +319,6 @@ with tab_macro:
 with tab_safezone:
     st.markdown("#### 🎯 Sniper Safe Zones")
     
-    # 🚨 Dynamic Risk Shield Toggle 🚨
     c_tog1, c_tog2 = st.columns([3, 1])
     with c_tog1:
         st.caption("Enter ticker and expiry to calculate structural support. Matrix will load below.")
@@ -349,7 +353,6 @@ with tab_safezone:
                         if pd.isna(live_rsi): live_rsi = 50.0
                     except: live_rsi = 50.0
                     
-                    # 🚨 Respecting the User's Choice for Multiplier 🚨
                     if dynamic_risk:
                         if live_rsi < 40:
                             put_mult, call_mult = 0.5, 1.5
@@ -471,16 +474,13 @@ with tab_safezone:
                     st.markdown("#### 🎯 Target Strikes")
                     c_tgt1, c_tgt2 = st.columns(2)
                     c_tgt1.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00b09b;">🟢 TARGET PUT: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
-                    # Just establishing ceiling target for visual symmetry
                     c_tgt2.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL: ${math_ceil:.2f}</div><div class="target-sub">Auto-Ceiling</div></div>""", unsafe_allow_html=True)
 
-                    # 🚨 THE LIVE PREMIUM MATRIX 🚨
                     if not puts_data.empty:
                         st.write("---")
                         st.markdown("#### 🛒 Live Premium Matrix (Puts)")
                         st.caption("Check the 'Bid' and 'Ask' closely. If the spread is wide (e.g. Bid $0.10, Ask $1.00), do NOT trade it. Slippage will kill you.")
                         
-                        # Filter puts to show strikes below current price
                         display_puts = puts_data[(puts_data['strike'] <= px) & (puts_data['strike'] > px * 0.6)].copy()
                         
                         if not display_puts.empty:
@@ -522,7 +522,7 @@ with tab_ledger:
             <b>Hold:</b> Best is to wait it out and accept you could lose the entire (spread - premium).<br><br>
             <b>The 45-DTE Golden Rules:</b><br>
             🎯 Close trades when hitting 60% - 75% profit.<br>
-            ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE).<br>
+            ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE)<br>
             ⚠️ Do not hold into the final 20 days — Gamma risk will destroy your steady Theta gains.
         </div>
     </div>
@@ -538,7 +538,6 @@ with tab_ledger:
     active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
     active_count = len(active_df)
     
-    # --- The Stealth Spread Math ---
     capital_at_risk = 0.0
     for _, row in active_df.iterrows():
         try:
