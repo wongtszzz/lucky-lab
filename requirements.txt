@@ -6,3 +6,4 @@ alpaca-py
 PyGithub
 yfinance
 plotly
+google-generativeai
