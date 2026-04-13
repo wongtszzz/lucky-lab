@@ -281,14 +281,9 @@ with tab_macro:
                 # 1. Ask Google for the master list of approved models
                 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
-                # 2. Hard filter: Remove ANY model with '2.5' in the name so you don't hit the 20 request quota limit.
-                safe_models = [m for m in valid_models if '2.5' not in m]
-                
-                if not safe_models:
-                    return f"⚠️ **Error:** Only quota-limited models found. Google sees: {valid_models}"
-                    
-                # 3. Find the best flash model, or just grab whatever safe model is available.
-                target_model = next((m for m in safe_models if 'flash' in m), safe_models[0])
+                # 2. Target the high-throughput FREE tier model by explicitly hunting for "lite"
+                # This completely bypasses the limit:0 trap on the standard models.
+                target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
                 
                 model = genai.GenerativeModel(target_model)
                 
@@ -316,7 +311,7 @@ with tab_macro:
                 return response.text
                 
             except Exception as e:
-                # 4. THE ULTIMATE DIAGNOSTIC: If it fails, print the exact models to the screen so we can see what's wrong.
+                # 3. THE ULTIMATE DIAGNOSTIC
                 try:
                     debug_models = [m.name for m in genai.list_models()]
                     return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
