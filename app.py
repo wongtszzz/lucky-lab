@@ -284,8 +284,8 @@ with tab_macro:
                 if not valid_models:
                     return "⚠️ **Error:** API key connected, but Google returned 0 available generative models."
                     
-                # Prefer the newest "flash" models for speed, fallback to whatever is first on the list
-                target_model = next((m for m in valid_models if 'flash' in m), valid_models[0])
+                # Specifically target the 1.5 model to get 1,500 free requests per day
+target_model = next((m for m in valid_models if '1.5-flash' in m), valid_models[0])
                 
                 # 2. Call the dynamically validated model
                 model = genai.GenerativeModel(target_model)
