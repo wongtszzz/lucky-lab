@@ -270,27 +270,26 @@ with tab_macro:
 
         st.write("---")
         
-        # 🚨 NEW AI CHIEF ECONOMIST ENGINE (SELF-HEALING) 🚨
+        # 🚨 HIGH-LIMIT CHIEF ECONOMIST ENGINE 🚨
         st.markdown("#### 🧠 AI Chief Economist Brief")
         
-        @st.cache_data(ttl=3600) # Caches the AI report for 1 hour to save API calls
+        @st.cache_data(ttl=3600) 
         def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 
-                # 1. Self-Healing Engine: Dynamically find an approved model
+                # Fetch available models
                 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
                 if not valid_models:
                     return "⚠️ **Error:** API key connected, but Google returned 0 available generative models."
                     
-                # Specifically target the 1.5 model to get 1,500 free requests per day
-                target_model = next((m for m in valid_models if '1.5-flash' in m), valid_models[0])
-
-                # 2. Call the dynamically validated model
+                # STRICTLY target the 1.5-flash model to access the 1,500 daily free tier limit.
+                # Do NOT fall back to 2.5-flash which has a 20 request limit.
+                target_model = next((m for m in valid_models if '1.5-flash' in m), 'models/gemini-1.5-flash')
+                
                 model = genai.GenerativeModel(target_model)
                 
-                # 3. Give it the Chief Economist instructions
                 prompt = f"""
                 You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
                 Write a morning macro brief based strictly on these live numbers:
@@ -311,7 +310,6 @@ with tab_macro:
                 (Give specific tactical advice. Should we sell 45-DTE Puts? Switch to Call Credit Spreads? Avoid weeklies? Be definitive).
                 """
                 
-                # 4. Generate the live report
                 response = model.generate_content(prompt)
                 return response.text
                 
