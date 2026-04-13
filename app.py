@@ -270,7 +270,7 @@ with tab_macro:
 
         st.write("---")
         
-        # 🚨 HIGH-LIMIT CHIEF ECONOMIST ENGINE 🚨
+        # 🚨 THE FINAL, BULLETPROOF AI CHIEF ECONOMIST 🚨
         st.markdown("#### 🧠 AI Chief Economist Brief")
         
         @st.cache_data(ttl=3600) 
@@ -278,15 +278,17 @@ with tab_macro:
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 
-                # Fetch available models
+                # 1. Ask Google for the master list of approved models
                 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
-                if not valid_models:
-                    return "⚠️ **Error:** API key connected, but Google returned 0 available generative models."
+                # 2. Hard filter: Remove ANY model with '2.5' in the name so you don't hit the 20 request quota limit.
+                safe_models = [m for m in valid_models if '2.5' not in m]
+                
+                if not safe_models:
+                    return f"⚠️ **Error:** Only quota-limited models found. Google sees: {valid_models}"
                     
-                # STRICTLY target the 1.5-flash model to access the 1,500 daily free tier limit.
-                # Do NOT fall back to 2.5-flash which has a 20 request limit.
-                target_model = next((m for m in valid_models if '1.5-flash' in m), 'models/gemini-1.5-flash')
+                # 3. Find the best flash model, or just grab whatever safe model is available.
+                target_model = next((m for m in safe_models if 'flash' in m), safe_models[0])
                 
                 model = genai.GenerativeModel(target_model)
                 
@@ -314,7 +316,12 @@ with tab_macro:
                 return response.text
                 
             except Exception as e:
-                return f"⚠️ **AI Engine Offline.** Error details: {e}"
+                # 4. THE ULTIMATE DIAGNOSTIC: If it fails, print the exact models to the screen so we can see what's wrong.
+                try:
+                    debug_models = [m.name for m in genai.list_models()]
+                    return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
+                except:
+                    return f"⚠️ **AI Engine Offline.** Error details: {e}"
 
         with st.spinner("Chief Economist is analyzing the live data..."):
             ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, breadth_avg)
