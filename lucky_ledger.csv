@@ -3,7 +3,7 @@ Date,Ticker,Type,Strike,Long Strike,Expiry,Open Price,Close Price,Qty,Commission
 2026-04-13,VOO,Covered Call,632.5,0.0,2026-04-17,1.1,0.0,1,1.05,108.95,Open / Active
 2026-04-13,SNDK,Short Put,597.5,0.0,2026-04-17,0.85,0.0,1,0.05,84.95,Open / Active
 2026-04-13,COST,Short Put,950.0,0.0,2026-04-17,1.14,0.0,1,1.06,112.94,Open / Active
-2026-04-13,META,Short Put,585.0,0.0,2026-04-15,0.32,0.0,1,1.05,30.95,Open / Active
+2026-04-13,META,Short Put,585.0,0.0,2026-04-15,0.32,0.0,1,1.05,30.95,Expired (Win)
 2026-04-13,GLD,Covered Call,440.0,0.0,2026-04-15,1.6,3.3,1,1.6,-171.6,Closed (Loss)
 2026-04-10,GLD,Covered Call,440.0,0.0,2026-04-13,1.94,0.0,1,0.81,193.19,Expired (Win)
 2026-04-09,TSM,Short Put,335.0,0.0,2026-04-10,0.18,0.0,3,2.1,51.9,Expired (Win)
