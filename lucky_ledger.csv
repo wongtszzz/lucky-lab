@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Long Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-04-20,GLD,Covered Call,445.0,0.0,2026-04-22,2.26,0.0,1,1.06,224.94,Open / Active
+2026-04-20,MU,Short Put,320.0,0.0,2026-05-29,4.48,0.0,1,1.05,446.95,Open / Active
 2026-04-17,VOO,Covered Call,640.0,0.0,2026-05-15,20.5,0.0,1,1.09,2048.91,Open / Active
 2026-04-17,GLD,Covered Call,450.0,0.0,2026-04-20,2.33,0.0,1,0.81,232.19,Open / Active
 2026-04-15,GLD,Covered Call,444.0,0.0,2026-04-17,3.6,3.9,1,2.11,-32.11,Closed (Loss)
