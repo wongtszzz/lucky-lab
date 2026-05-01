@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Long Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-05-01,MSFT,Short Put,387.5,0.0,2026-05-01,0.37,0.0,1,0.8,36.2,Open / Active
+2026-05-01,GLD,Covered Call,431.0,0.0,2026-05-04,0.65,0.0,1,1.05,63.95,Open / Active
 2026-04-28,GLD,Covered Call,428.0,0.0,2026-05-01,1.6,0.0,1,0.8,159.2,Open / Active
 2026-04-27,TSM,Short Put,367.5,0.0,2026-05-01,1.07,0.0,1,1.05,105.95,Open / Active
 2026-04-27,NVDA,Short Put,190.0,0.0,2026-04-29,0.14,0.0,2,1.4,26.6,Expired (Win)
