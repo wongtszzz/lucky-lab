@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Long Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-05-11,GLD,Covered Call,440.0,0.0,2026-05-13,1.51,0.0,1,1.05,149.95,Open / Active
 2026-05-08,VOO,Covered Call,650.0,0.0,2026-06-26,35.35,0.0,1,1.13,3533.87,Open / Active
 2026-05-08,GLD,Covered Call,440.0,0.0,2026-05-11,0.75,0.0,1,1.05,73.95,Open / Active
 2026-05-08,VRT,Short Put,310.0,0.0,2026-05-08,0.38,0.0,1,0.8,37.2,Expired (Win)
