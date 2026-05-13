@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Long Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-05-13,TSLA,Short Put,387.5,0.0,2026-05-15,0.26,0.0,1,1.05,24.95,Open / Active
 2026-05-12,LITE,Short Put,800.0,0.0,2026-05-15,1.0,0.0,1,1.05,98.95,Open / Active
 2026-05-12,ETN,Short Put,367.5,0.0,2026-05-22,1.4,0.0,1,1.05,138.95,Open / Active
 2026-05-12,VRT,Short Put,292.5,0.0,2026-05-22,2.2,0.0,1,1.06,218.94,Open / Active
