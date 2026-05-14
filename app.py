@@ -409,4 +409,11 @@ with tab_safezone:
                                     put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
                                     put_wall_str = f"${put_wall:.2f}"
                                 if not calls_filtered.empty:
+                                  pass # This tells Python "Nothing to see here!"
+                    
+            except Exception as e:
+                # This catches any errors so the whole app doesn't die
+                st.error(f"Something went wrong with the math: {e}")
+
+
 
