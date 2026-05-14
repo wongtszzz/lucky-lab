@@ -106,7 +106,6 @@ def refresh_calculations(current_df):
         except: 
             ex_d = datetime.now().date()
         
-        # Robust status updates
         if close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
         elif "open" in current_status.lower() and ex_d < datetime.now().date(): 
@@ -120,19 +119,25 @@ def refresh_calculations(current_df):
     return sort_ledger(current_df)
 
 def get_weekly_stats(df):
+    """
+    Fixed P&L Logic: Now calculates based on trades that are NOT open, 
+    and checks if the Expiry OR the Date Opened falls within the current week.
+    """
     if df.empty:
         return 0.0, 0
     
-    # Work on a copy to avoid altering the main view
     calc_df = df.copy()
     calc_df['Date'] = pd.to_datetime(calc_df['Date'], errors='coerce')
+    calc_df['Expiry'] = pd.to_datetime(calc_df['Expiry'], errors='coerce')
     
-    # Calculate start of the current week (Monday)
     today = datetime.now().date()
     start_of_week = pd.Timestamp(today - timedelta(days=today.weekday()))
     
-    # Filter for trades mapped to this week that are NOT open
-    weekly_df = calc_df[(calc_df['Date'] >= start_of_week) & (~calc_df['Status'].str.lower().str.contains('open', na=False))]
+    # Filter for trades that are closed/expired AND relate to this week
+    weekly_df = calc_df[
+        (~calc_df['Status'].str.lower().str.contains('open', na=False)) & 
+        ((calc_df['Expiry'] >= start_of_week) | (calc_df['Date'] >= start_of_week))
+    ]
     
     weekly_pnl = weekly_df['Premium'].sum()
     trade_count = len(weekly_df)
@@ -421,30 +426,4 @@ with tab_ledger:
     # Weekly P&L Tracker
     week_pnl, week_trades = get_weekly_stats(st.session_state.journal)
     c_met1, c_met2 = st.columns(2)
-    c_met1.metric("This Week's Realized P&L", f"${week_pnl:.2f}", delta_color="normal" if week_pnl >= 0 else "inverse")
-    c_met2.metric("Trades Closed This Week", str(week_trades))
-    
-    st.write("---")
-    st.write("**Edit your ledger below.** Add new rows at the bottom. Check boxes or type to adjust values. Click Save to push to GitHub.")
-    
-    # Data Editor
-    edited_df = st.data_editor(
-        st.session_state.journal, 
-        num_rows="dynamic", 
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Date": st.column_config.DateColumn("Date Opened", format="YYYY-MM-DD"),
-            "Expiry": st.column_config.DateColumn("Expiry Date", format="YYYY-MM-DD"),
-            "Type": st.column_config.SelectboxColumn("Type", options=["Put", "Call", "Put Spread", "Call Spread", "Iron Condor"]),
-            "Status": st.column_config.SelectboxColumn("Status", options=["Open / Active", "Closed (Win)", "Closed (Loss)", "Expired (Win)"])
-        }
-    )
-    
-    if st.button("💾 Save & Sync to GitHub", type="primary"):
-        with st.spinner("Syncing to GitHub Repository..."):
-            st.session_state.journal = refresh_calculations(edited_df)
-            save_journal(st.session_state.journal)
-            st.success("Ledger successfully updated and synced!")
-            time.sleep(1)
-            st.rerun()
+    c_met1.metric("This Week's Realized P&L", f"${week_pnl:.2f}", delta_color="normal" if week_pnl >= 0 else "i
