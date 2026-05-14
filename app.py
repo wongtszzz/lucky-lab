@@ -410,4 +410,3 @@ with tab_safezone:
                                     put_wall_str = f"${put_wall:.2f}"
                                 if not calls_filtered.empty:
 
-I wh
