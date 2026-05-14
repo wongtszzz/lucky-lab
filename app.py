@@ -1,4 +1,4 @@
-import streamlit as st
+Import streamlit as st
 import pandas as pd
 import numpy as np
 import io
@@ -34,6 +34,18 @@ st.markdown("""
     [data-testid="stMetricValue"] { font-size: 2.2rem !important; font-weight: 800 !important; }
     [data-testid="stMetricDelta"] { font-size: 0.95rem !important; color: #888888 !important; justify-content: center !important; }
     [data-testid="stMetricDelta"] > svg { display: none; }
+    .footer-right { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.8em; z-index: 1000; }
+    
+    .creed-box { background-color: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 6px solid #2962FF; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px; }
+    .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
+    .creed-text { font-size: 0.95em; line-height: 1.6; }
+    
+    .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-title { font-size: 0.85em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .sniper-value { font-size: 1.8em; font-weight: bold; }
+    .put-color { color: #00b09b; }
+    .call-color { color: #ff4b4b; }
+    .neutral-color { color: #f39c12; }
     
     .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 20px; border-radius: 5px; margin-bottom: 20px;}
     .synthesis-box h3 { margin-top: 0; font-size: 1.2em; color: #2962FF; }
@@ -62,7 +74,7 @@ try:
     gh = Github(GITHUB_TOKEN)
     repo = gh.get_repo(GITHUB_REPO)
 except Exception as e:
-    st.error(f"Secrets Error. Check Streamlit Settings. Details: {e}")
+    st.error(f"Secrets Error. Check Streamlit Settings. {e}")
     st.stop()
 
 FILE_PATH = "lucky_ledger.csv"
@@ -72,10 +84,10 @@ def sort_ledger(df):
     if df.empty: return df
     df['temp_date'] = pd.to_datetime(df['Date'], errors='coerce')
     def rank_status(s):
-        s = str(s).lower()
-        if "open" in s: return 1
-        if "win" in s: return 2
-        if "loss" in s: return 3
+        s = str(s)
+        if "Open" in s: return 1
+        if "Win" in s: return 2
+        if "Loss" in s: return 3
         return 4
     df['status_rank'] = df['Status'].apply(rank_status)
     df = df.sort_values(by=['temp_date', 'status_rank'], ascending=[False, True])
@@ -101,14 +113,12 @@ def refresh_calculations(current_df):
         
         p = round(((open_p - close_p) * 100 * qty) - comm, 2)
         
-        try: 
-            ex_d = pd.to_datetime(r["Expiry"]).date()
-        except: 
-            ex_d = datetime.now().date()
+        try: ex_d = pd.to_datetime(r["Expiry"]).date()
+        except: ex_d = datetime.now().date()
         
         if close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
-        elif "open" in current_status.lower() and ex_d < datetime.now().date(): 
+        elif "Open" in current_status and ex_d < datetime.now().date(): 
             s = "Expired (Win)"
         else: 
             s = current_status if current_status.strip() != "nan" and current_status.strip() != "" else "Open / Active"
@@ -117,28 +127,6 @@ def refresh_calculations(current_df):
         
     current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
     return sort_ledger(current_df)
-
-def get_weekly_stats(df):
-    if df.empty:
-        return 0.0, 0
-    
-    calc_df = df.copy()
-    calc_df['Date'] = pd.to_datetime(calc_df['Date'], errors='coerce')
-    calc_df['Expiry'] = pd.to_datetime(calc_df['Expiry'], errors='coerce')
-    
-    today = datetime.now().date()
-    start_of_week = pd.Timestamp(today - timedelta(days=today.weekday()))
-    
-    # Filter for trades closed/expired THIS week OR opened THIS week
-    weekly_df = calc_df[
-        (~calc_df['Status'].str.lower().str.contains('open', na=False)) & 
-        ((calc_df['Expiry'] >= start_of_week) | (calc_df['Date'] >= start_of_week))
-    ]
-    
-    weekly_pnl = weekly_df['Premium'].sum()
-    trade_count = len(weekly_df)
-    
-    return float(weekly_pnl), int(trade_count)
 
 def save_journal(df):
     try:
@@ -151,8 +139,7 @@ def save_journal(df):
         except:
             repo.create_file(FILE_PATH, "Initial commit", csv_content)
         st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    except Exception as e: 
-        st.error(f"Failed to save to GitHub: {e}")
+    except: pass
 
 def load_journal():
     try:
@@ -166,14 +153,13 @@ def load_journal():
                 elif c == "Long Strike": raw_df[c] = 0.0
                 else: raw_df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
         
-        original_open = len(raw_df[raw_df['Status'].astype(str).str.contains('Open', na=False, case=False)])
+        original_open = len(raw_df[raw_df['Status'].astype(str).str.contains('Open', na=False)])
         refreshed_df = refresh_calculations(raw_df[COLS])
-        new_open = len(refreshed_df[refreshed_df['Status'].astype(str).str.contains('Open', na=False, case=False)])
+        new_open = len(refreshed_df[refreshed_df['Status'].astype(str).str.contains('Open', na=False)])
         needs_auto_save = original_open > new_open 
         
         return refreshed_df, needs_auto_save
-    except: 
-        return pd.DataFrame(columns=COLS), False
+    except: return pd.DataFrame(columns=COLS), False
 
 if 'journal' not in st.session_state: 
     loaded_df, needs_auto_save = load_journal()
@@ -182,7 +168,7 @@ if 'journal' not in st.session_state:
     
     if needs_auto_save:
         save_journal(st.session_state.journal)
-        st.toast("🧹 Auto-Sweep detected expired trades.", icon="✅")
+        st.toast("🧹 Auto-Sweep: Passed expiration dates detected. Trades marked as Expired and permanently moved to Realized P&L.", icon="✅")
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
@@ -214,10 +200,14 @@ def get_automated_breadth(ticker_list):
 
 @st.cache_data(ttl=900)
 def get_sniper_history(ticker_str):
-    hist, exps = pd.DataFrame(), []
+    hist = pd.DataFrame()
+    exps = []
     try:
         t = yf.Ticker(ticker_str)
         hist = t.history(period='1y')
+    except: pass 
+    try:
+        t = yf.Ticker(ticker_str)
         exps = list(t.options)
     except: pass 
     return hist, exps
@@ -231,97 +221,191 @@ def get_options_chain(ticker_str, exp_date):
     except: return pd.DataFrame(), pd.DataFrame()
 
 # --- 3. UI TABS ---
-tab_macro, tab_safezone, tab_ledger = st.tabs(["🌍 Macro Playbook", "🎯 Sniper Safe Zones", "📓 Trade Book"])
+tab_macro, tab_safezone, tab_ledger = st.tabs([
+    "🌍 Macro Playbook", 
+    "🎯 Sniper Safe Zones", 
+    "📓 Trade Book"
+])
 
 # --- TAB 1: MACRO PLAYBOOK ---
 with tab_macro:
     head_col, btn_col = st.columns([5, 1])
-    with head_col: st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
+    with head_col: 
+        st.markdown("#### 🌍 The 3-Pillar Macro Matrix")
     with btn_col: 
         if st.button("🔄 Refresh Data", use_container_width=True, key="ref1"):
             st.cache_data.clear()
             st.rerun()
             
+    st.caption(f"Last API Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (Pulls fresh data every 15 mins or on manual refresh)")
+    
     try:
         oil_px, oil_pct = get_macro_live("CL=F")
         dxy_px, dxy_pct = get_macro_live("DX-Y.NYB")
         vix_px, vix_pct = get_macro_live("^VIX")
+        st.session_state.current_vix = vix_px if vix_px > 0 else 20.0
         
+        oil_status = "🟢 Contained" if oil_px < 80 else ("🟡 Hot" if oil_px <= 85 else "🔴 Spiking")
+        dxy_status = "🟢 Weak" if dxy_px < 103 else ("🟡 Neutral" if dxy_px <= 105 else "🔴 Strong")
+        vix_status = "🟢 Complacent" if vix_px < 18 else ("🟡 Elevated" if vix_px <= 25 else "🔴 Panic")
+
         m1, m2, m3 = st.columns(3)
-        m1.metric("🛢️ WTI Crude Oil", f"${oil_px:,.2f}", f"{oil_pct:+.2f}%", delta_color="inverse" if oil_px > 80 else "normal")
-        m2.metric("💵 US Dollar (DXY)", f"{dxy_px:,.2f}", f"{dxy_pct:+.2f}%", delta_color="inverse" if dxy_px > 105 else "normal")
-        m3.metric("📉 Volatility (VIX)", f"{vix_px:,.2f}", f"{vix_pct:+.2f}%", delta_color="inverse" if vix_px > 25 else "normal")
+        m1.metric("🛢️ WTI Crude Oil", f"${oil_px:,.2f}", f"{oil_status} ({oil_pct:+.2f}%)", delta_color="inverse" if oil_px > 80 else "normal")
+        m2.metric("💵 US Dollar (DXY)", f"{dxy_px:,.2f}", f"{dxy_status} ({dxy_pct:+.2f}%)", delta_color="inverse" if dxy_px > 105 else "normal")
+        m3.metric("📉 Volatility (VIX)", f"{vix_px:,.2f}", f"{vix_status} ({vix_pct:+.2f}%)", delta_color="inverse" if vix_px > 25 else "normal")
 
         st.write("---")
+        
         sp500_sectors = ["XLK", "XLV", "XLF", "XLY", "XLC", "XLI", "XLP", "XLE", "XLU", "XLRE", "XLB"]
-        nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX"]
+        nasdaq_leaders = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "COST", "NFLX", "AMD", "PEP", "CSCO", "TMUS", "ADBE"]
         
         s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
         nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
+        breadth_avg = (s5tw_pct + nctw_pct) / 2
         
+        st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
         b1, b2 = st.columns(2)
-        b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Up")
-        b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Leaders Up")
+        b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
+        b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
 
-    except Exception as e: st.error(f"Macro Error: {e}")
+        st.write("---")
+        
+        # 🚨 THE FINAL, BULLETPROOF AI CHIEF ECONOMIST 🚨
+        st.markdown("#### 🧠 AI Chief Economist Brief")
+        
+        @st.cache_data(ttl=3600) 
+        def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
+            try:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # 1. Ask Google for the master list of approved models
+                valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                # 2. Target the high-throughput FREE tier model by explicitly hunting for "lite"
+                # This completely bypasses the limit:0 trap on the standard models.
+                target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
+                
+                model = genai.GenerativeModel(target_model)
+                
+                prompt = f"""
+                You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
+                Write a morning macro brief based strictly on these live numbers:
+                - VIX: {vix:.2f}
+                - DXY (US Dollar): {dxy:.2f}
+                - WTI Crude Oil: ${oil:.2f}
+                - Market Breadth: {breadth_avg:.0f}% of stocks trending up.
+                
+                Format your response in exactly 3 short, punchy sections using Markdown. Do not use filler words.
+                
+                ### 🌍 The Current Regime
+                (Synthesize what these specific metrics mean together right now. Identify if it is risk-on, risk-off, a divergent top, or oversold capitulation).
+                
+                ### 📰 The Forward Look
+                (Based on these metrics, what macroeconomic themes or breaking points should the desk watch out for in the coming days).
+                
+                ### 🎯 Option Seller Action Plan
+                (Give specific tactical advice. Should we sell 45-DTE Puts? Switch to Call Credit Spreads? Avoid weeklies? Be definitive).
+                """
+                
+                response = model.generate_content(prompt)
+                return response.text
+                
+            except Exception as e:
+                # 3. THE ULTIMATE DIAGNOSTIC
+                try:
+                    debug_models = [m.name for m in genai.list_models()]
+                    return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
+                except:
+                    return f"⚠️ **AI Engine Offline.** Error details: {e}"
+
+        with st.spinner("Chief Economist is analyzing the live data..."):
+            ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, breadth_avg)
+            
+        st.markdown(f"""
+        <div class="synthesis-box">
+            {ai_brief}
+        </div>
+        """, unsafe_allow_html=True)
+
+    except Exception as e: pass
 
 # --- TAB 2: SNIPER SAFE ZONES ---
 with tab_safezone:
     st.markdown("#### 🎯 Sniper Safe Zones")
+    
+    c_tog1, c_tog2 = st.columns([3, 1])
+    with c_tog1:
+        st.caption("Enter ticker and expiry to calculate structural support. Matrix will load below.")
+    with c_tog2:
+        dynamic_risk = st.checkbox("🛡️ Enable RSI Risk Shield", value=False, help="When checked, modifies risk multiplier based on Oversold/Overbought conditions. Leave unchecked to lock multiplier at 1.0 (Rigid/Riskier).")
+    
     c1, c2, c3 = st.columns([1, 1, 2])
-    with c1: calc_tk = st.text_input("Ticker", value="TSLA").upper()
+    with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
     with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=45))
     with c3:
         st.write(""); st.write("")
         run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
     
     if run_calc:
-        with st.spinner(f"Analyzing {calc_tk}..."):
-            hist_1y, avail_exps = get_sniper_history(calc_tk)
-            if not hist_1y.empty:
-                px = float(hist_1y['Close'].iloc[-1])
-                st.info(f"Current Price: ${px:.2f}. Expected move and walls are calculated using market maker straddle pricing.")
-                # Sniper results would display here...
+        with st.spinner(f"Running automated X-Ray and fetching Options Matrix for {calc_tk}..."):
+            try:
+                hist_1y, avail_exps = get_sniper_history(calc_tk)
+                
+                if hist_1y.empty:
+                    st.error(f"Invalid Ticker or No Data Found for {calc_tk}.")
+                else:
+                    px = float(hist_1y['Close'].iloc[-1])
+                    beta = 1.0 
+                    days_to_exp = max((calc_ex - datetime.now().date()).days, 1)
+                    
+                    try:
+                        delta = hist_1y['Close'].diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        live_rsi = 100 - (100 / (1 + rs.iloc[-1]))
+                        if pd.isna(live_rsi): live_rsi = 50.0
+                    except: live_rsi = 50.0
+                    
+                    if dynamic_risk:
+                        if live_rsi < 40:
+                            put_mult, call_mult = 0.5, 1.5
+                            risk_status = f"🛡️ Shield ACTIVE: OVERSOLD (RSI: {live_rsi:.1f}). Put Risk Skew: 0.5x."
+                        elif live_rsi > 60:
+                            put_mult, call_mult = 1.5, 0.5
+                            risk_status = f"🛡️ Shield ACTIVE: OVERBOUGHT (RSI: {live_rsi:.1f}). Put Risk Skew: 1.5x."
+                        else:
+                            put_mult, call_mult = 1.0, 1.0
+                            risk_status = f"🛡️ Shield ACTIVE: NEUTRAL (RSI: {live_rsi:.1f}). Risk Skew: 1.0x."
+                    else:
+                        put_mult, call_mult = 1.0, 1.0
+                        risk_status = f"⚠️ Shield OFF: Rigid 1.0x Multiplier applied regardless of RSI ({live_rsi:.1f})."
 
-# --- TAB 3: TRADE BOOK ---
-with tab_ledger:
-    st.markdown("#### 📓 Trade Book & Ledger")
-    
-    week_pnl, week_trades = get_weekly_stats(st.session_state.journal)
-    c_met1, c_met2 = st.columns(2)
-    
-    # FIXED: Line 429 syntax error resolved below
-    c_met1.metric("This Week's Realized P&L", f"${week_pnl:.2f}", delta_color="normal" if week_pnl >= 0 else "inverse")
-    c_met2.metric("Trades Closed This Week", str(week_trades))
-    
-    st.write("---")
-    
-    # Prep display data (Convert strings to date objects for the UI widget)
-    display_df = st.session_state.journal.copy()
-    display_df['Date'] = pd.to_datetime(display_df['Date'], errors='coerce').dt.date
-    display_df['Expiry'] = pd.to_datetime(display_df['Expiry'], errors='coerce').dt.date
-    
-    edited_df = st.data_editor(
-        display_df, 
-        num_rows="dynamic", 
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Date": st.column_config.DateColumn("Date Opened", format="YYYY-MM-DD"),
-            "Expiry": st.column_config.DateColumn("Expiry Date", format="YYYY-MM-DD"),
-            "Type": st.column_config.SelectboxColumn("Type", options=["Put", "Call", "Put Spread", "Call Spread", "Iron Condor"]),
-            "Status": st.column_config.SelectboxColumn("Status", options=["Open / Active", "Closed (Win)", "Closed (Loss)", "Expired (Win)"])
-        }
-    )
-    
-    if st.button("💾 Save & Sync to GitHub", type="primary"):
-        with st.spinner("Syncing..."):
-            # Convert back to strings for CSV storage
-            edited_df['Date'] = pd.to_datetime(edited_df['Date']).dt.strftime('%Y-%m-%d')
-            edited_df['Expiry'] = pd.to_datetime(edited_df['Expiry']).dt.strftime('%Y-%m-%d')
-            
-            st.session_state.journal = refresh_calculations(edited_df)
-            save_journal(st.session_state.journal)
-            st.success("Synced!")
-            time.sleep(1)
-            st.rerun()
+                    st.markdown(f"<div class='auto-risk-banner'>🤖 <b>Risk Engine:</b> {risk_status}</div>", unsafe_allow_html=True)
+                    
+                    put_wall_str, call_wall_str = "N/A", "N/A"
+                    put_wall, call_wall = None, None
+                    base_exp_move = 0.0
+                    math_type_str = "Theoretical IV"
+                    
+                    calls_data, puts_data = pd.DataFrame(), pd.DataFrame()
+                    
+                    try:
+                        if avail_exps:
+                            target_exp = calc_ex.strftime('%Y-%m-%d')
+                            if target_exp not in avail_exps: target_exp = avail_exps[0]
+                            
+                            calls_data, puts_data = get_options_chain(calc_tk, target_exp)
+                            
+                            if not calls_data.empty and not puts_data.empty:
+                                closest_call = calls_data.iloc[(calls_data['strike'] - px).abs().argsort()[:1]]
+                                closest_put = puts_data.iloc[(puts_data['strike'] - px).abs().argsort()[:1]]
+                                base_exp_move = float(closest_call['lastPrice'].values[0] + closest_put['lastPrice'].values[0])
+                                math_type_str = "Market Maker Straddle"
+                                
+                                puts_filtered = puts_data[(puts_data['strike'] >= px * 0.70) & (puts_data['strike'] <= px)]
+                                calls_filtered = calls_data[(calls_data['strike'] <= px * 1.30) & (calls_data['strike'] >= px)]
+                                if not puts_filtered.empty:
+                                    put_wall = puts_filtered.loc[puts_filtered['openInterest'].idxmax()]['strike']
+                                    put_wall_str = f"${put_wall:.2f}"
+                                if not calls_filtered.empty:
