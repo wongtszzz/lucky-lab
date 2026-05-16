@@ -1,137 +1,146 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import yfinance as yf
-import google.generativeai as genai
-from github import Github
-import base64
 import io
+import base64
+import time
+import yfinance as yf
 from datetime import datetime, timedelta
+from alpaca.data.historical import OptionHistoricalDataClient, StockHistoricalDataClient
+from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, StockSnapshotRequest
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.enums import OptionsFeed, DataFeed
+from github import Github
+import google.generativeai as genai
 
-# --- 0. INITIAL SETUP & APP ARCHITECTURE ---
-st.set_page_config(layout="wide", page_title="The Quant Desk", page_icon="📓")
+# --- 1. CONFIG & API ---
+st.set_page_config(page_title="Lucky Money Lab", page_icon="🧪", layout="wide")
 
-# CSS Styling Injector
 st.markdown("""
 <style>
-    .reportview-container { background: #0f1116; color: #e0e6ed; }
-    .synthesis-box { background-color: #161b22; padding: 20px; border-radius: 8px; border-left: 5px solid #00b09b; margin-bottom: 20px; }
-    .sniper-box { background-color: #1c2128; padding: 15px; border-radius: 6px; border: 1px solid #30363d; text-align: center; min-height: 120px; }
-    .sniper-title { font-size: 0.9em; color: #8b949e; margin-bottom: 8px; font-weight: 600; }
-    .sniper-value { font-size: 1.4em; font-weight: bold; }
+    [data-testid="metric-container"] {
+        background-color: rgba(28, 131, 225, 0.05); 
+        border: 1px solid rgba(128, 128, 128, 0.15);
+        border-radius: 12px;
+        padding: 15px;
+        height: 140px; 
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    [data-testid="stMetricValue"] { font-size: 2.2rem !important; font-weight: 800 !important; }
+    [data-testid="stMetricDelta"] { font-size: 0.95rem !important; color: #888888 !important; justify-content: center !important; }
+    [data-testid="stMetricDelta"] > svg { display: none; }
+    .footer-right { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.8em; z-index: 1000; }
+    
+    .creed-box { background-color: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 6px solid #2962FF; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px; }
+    .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
+    .creed-text { font-size: 0.95em; line-height: 1.6; }
+    
+    .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-title { font-size: 0.85em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .sniper-value { font-size: 1.8em; font-weight: bold; }
     .put-color { color: #00b09b; }
     .call-color { color: #ff4b4b; }
-    .neutral-color { color: #f1c40f; }
-    .target-box-put { background: linear-gradient(135deg, #0d2621 0%, #071412 100%); padding: 20px; border-radius: 8px; border: 1px solid #00b09b; height: 100%; }
-    .target-box-call { background: linear-gradient(135deg, #2d1418 0%, #170a0c 100%); padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b; height: 100%; }
-    .target-title { font-size: 1.6em; font-weight: bold; margin-bottom: 5px; }
-    .target-sub { font-size: 0.85em; color: #8b949e; line-height: 1.4; }
-    .auto-risk-banner { background-color: #1f1911; border: 1px solid #f1c40f; padding: 10px; border-radius: 6px; margin-bottom: 15px; color: #e5c158; font-size: 0.9em; }
-    .creed-box { background: #161b22; padding: 18px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 20px; }
-    .creed-title { font-size: 1.1em; font-weight: bold; color: #58a6ff; margin-bottom: 10px; }
-    .creed-text { font-size: 0.88em; color: #c9d1d9; line-height: 1.6; }
-    .footer-right { text-align: right; font-size: 0.8em; color: #8b949e; margin-top: 30px; padding-right: 10px; }
+    .neutral-color { color: #f39c12; }
+    
+    .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 20px; border-radius: 5px; margin-bottom: 20px;}
+    .synthesis-box h3 { margin-top: 0; font-size: 1.2em; color: #2962FF; }
+    
+    .target-box-put { background-color: rgba(0, 176, 155, 0.1); border-left: 5px solid #00b09b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-box-call { background-color: rgba(255, 75, 75, 0.1); border-left: 5px solid #ff4b4b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-title { font-size: 2.2em; font-weight: 900; margin: 0; }
+    .target-sub { margin: 5px 0 0 0; color: #ccc; font-size: 1.1em; }
+    
+    .auto-risk-banner { background-color: rgba(255, 255, 255, 0.05); padding: 10px 15px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); margin-top: 10px; margin-bottom: 10px; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
-# Central Data Definitions
+st.markdown("### Lucky Money Lab 🧪")
+st.divider()
+
+# API Connections
+try:
+    API_KEY = st.secrets["ALPACA_KEY"]
+    SECRET_KEY = st.secrets["ALPACA_SECRET"]
+    GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+    GITHUB_REPO = st.secrets["GITHUB_REPO"]
+    
+    opt_client = OptionHistoricalDataClient(API_KEY, SECRET_KEY)
+    stock_client = StockHistoricalDataClient(API_KEY, SECRET_KEY)
+    gh = Github(GITHUB_TOKEN)
+    repo = gh.get_repo(GITHUB_REPO)
+except Exception as e:
+    st.error(f"Secrets Error. Check Streamlit Settings. {e}")
+    st.stop()
+
+FILE_PATH = "lucky_ledger.csv"
 COLS = ["Date", "Ticker", "Type", "Strike", "Long Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
-# GitHub API Configuration 
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
-REPO_NAME = st.secrets["GITHUB_REPO"]  
-FILE_PATH = "options_journal.csv"
-
-try:
-    g = Github(GITHUB_TOKEN)
-    repo = g.get_repo(REPO_NAME)
-except Exception as e:
-    st.error(f"Failed to connect to GitHub Repository: {e}")
-
-# Calculation Core Helpers
-def refresh_calculations(df):
-    refreshed = df.copy()
-    current_date = datetime.now().date()
-    
-    for i, row in refreshed.iterrows():
-        try:
-            status_str = str(row.get("Status", "Open / Active"))
-            
-            # Extract basic params safely
-            strike = float(row["Strike"]) if pd.notna(row["Strike"]) else 0.0
-            long_strike = float(row.get("Long Strike", 0.0)) if pd.notna(row.get("Long Strike", 0.0)) else 0.0
-            open_px = float(row["Open Price"]) if pd.notna(row["Open Price"]) else 0.0
-            close_px = float(row["Close Price"]) if pd.notna(row["Close Price"]) else 0.0
-            qty = int(row["Qty"]) if pd.notna(row["Qty"]) else 1
-            t_type = str(row["Type"])
-            
-            # Fixed Base Options Commission rates
-            comm_rate = 2.10 if (long_strike > 0) else 1.05
-            refreshed.at[i, "Commission"] = round(qty * comm_rate, 2)
-            comm = refreshed.at[i, "Commission"]
-            
-            # Expiry Evaluators
-            exp_date = pd.to_datetime(row["Expiry"]).date()
-            is_past_expiry = current_date > exp_date
-            
-            if "Open" in status_str and is_past_expiry:
-                status_str = "Expired (Win)"
-                refreshed.at[i, "Status"] = status_str
-            
-            # Matrix Math Computations
-            if "Open" in status_str:
-                refreshed.at[i, "Premium"] = round((open_px * 100 * qty) - comm, 2)
-            elif "Expired" in status_str or "Win" in status_str:
-                refreshed.at[i, "Close Price"] = 0.0
-                if "Spread" in t_type:
-                    refreshed.at[i, "Premium"] = round((open_px * 100 * qty) - comm, 2)
-                else:
-                    refreshed.at[i, "Premium"] = round((open_px * 100 * qty) - comm, 2)
-            elif "Loss" in status_str or "Closed" in status_str or "Rolled" in status_str:
-                if close_px == 0.0:
-                    refreshed.at[i, "Premium"] = -round((open_px * 200 * qty) - comm, 2)
-                else:
-                    refreshed.at[i, "Premium"] = round(((open_px - close_px) * 100 * qty) - comm, 2)
-        except:
-            pass
-            
-    return refreshed
-
 def sort_ledger(df):
-    df_calc = df.copy()
-    df_calc['temp_exp'] = pd.to_datetime(df_calc['Expiry'], errors='coerce')
-    df_calc['temp_date'] = pd.to_datetime(df_calc['Date'], errors='coerce')
+    if df.empty: return df
+    df['temp_date'] = pd.to_datetime(df['Date'], errors='coerce')
+    def rank_status(s):
+        s = str(s)
+        if "Open" in s: return 1
+        if "Win" in s: return 2
+        if "Loss" in s: return 3
+        return 4
+    df['status_rank'] = df['Status'].apply(rank_status)
+    df = df.sort_values(by=['temp_date', 'status_rank'], ascending=[False, True])
+    df['Date'] = df['temp_date'].dt.strftime('%Y-%m-%d')
+    return df.drop(columns=['temp_date', 'status_rank']).reset_index(drop=True)
+
+def refresh_calculations(current_df):
+    if current_df.empty: return current_df
+    current_df = current_df.copy()
     
-    def assign_rank(status):
-        st_lbl = str(status).lower()
-        if 'open' in st_lbl: return 1
-        if 'rolled' in st_lbl: return 2
-        return 3
+    if "Long Strike" not in current_df.columns:
+        current_df["Long Strike"] = 0.0
         
-    df_calc['status_rank'] = df_calc['Status'].apply(assign_rank)
-    
-    df_calc = df_calc.sort_values(
-        by=['status_rank', 'temp_exp', 'temp_date', 'Ticker'],
-        ascending=[True, True, False, True]
-    )
-    return df_calc.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
+    for col in ["Strike", "Long Strike", "Open Price", "Close Price", "Qty", "Commission"]:
+        current_df[col] = pd.to_numeric(current_df[col], errors='coerce').fillna(0)
+        
+    def update_row(r):
+        open_p = float(r["Open Price"]) if pd.notna(r["Open Price"]) else 0.0
+        close_p = float(r["Close Price"]) if pd.notna(r["Close Price"]) else 0.0
+        qty = int(r["Qty"]) if pd.notna(r["Qty"]) else 1
+        comm = float(r["Commission"]) if pd.notna(r["Commission"]) else 0.0
+        current_status = str(r.get("Status", "Open / Active"))
+        
+        p = round(((open_p - close_p) * 100 * qty) - comm, 2)
+        
+        try: ex_d = pd.to_datetime(r["Expiry"]).date()
+        except: ex_d = datetime.now().date()
+        
+        if close_p > 0: 
+            s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
+        elif "Open" in current_status and ex_d < datetime.now().date(): 
+            s = "Expired (Win)"
+        else: 
+            s = current_status if current_status.strip() != "nan" and current_status.strip() != "" else "Open / Active"
+            
+        return pd.Series([p, s])
+        
+    current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
+    return sort_ledger(current_df)
 
 def save_journal(df):
     try:
-        cleaned_df = df[COLS]
-        csv_buffer = io.StringIO()
-        cleaned_df.to_csv(csv_buffer, index=False)
-        csv_string = csv_buffer.getvalue()
-        
-        contents = repo.get_contents(FILE_PATH)
-        repo.update_file(FILE_PATH, f"Automated Synchronization Update {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", csv_string, contents.sha)
+        df_sorted = sort_ledger(df)
+        csv_content = df_sorted[COLS].to_csv(index=False)
+        commit_message = f"Ledger Auto-Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        try:
+            contents = repo.get_contents(FILE_PATH)
+            repo.update_file(contents.path, commit_message, csv_content, contents.sha)
+        except:
+            repo.create_file(FILE_PATH, "Initial commit", csv_content)
         st.session_state.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        return True
-    except Exception as e:
-        st.error(f"GitHub Sync Failure Engine Blocked: {e}")
-        return False
+    except: pass
 
-# --- 1. SESSION MANAGEMENT & AUTO-SWEEP ---
 def load_journal():
     try:
         contents = repo.get_contents(FILE_PATH)
@@ -150,8 +159,7 @@ def load_journal():
         needs_auto_save = original_open > new_open 
         
         return refreshed_df, needs_auto_save
-    except: 
-        return pd.DataFrame(columns=COLS), False
+    except: return pd.DataFrame(columns=COLS), False
 
 if 'journal' not in st.session_state: 
     loaded_df, needs_auto_save = load_journal()
@@ -262,15 +270,21 @@ with tab_macro:
 
         st.write("---")
         
-        # --- BULLETPROOF AI CHIEF ECONOMIST ---
+        # 🚨 THE FINAL, BULLETPROOF AI CHIEF ECONOMIST 🚨
         st.markdown("#### 🧠 AI Chief Economist Brief")
         
         @st.cache_data(ttl=3600) 
         def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # 1. Ask Google for the master list of approved models
                 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                # 2. Target the high-throughput FREE tier model by explicitly hunting for "lite"
+                # This completely bypasses the limit:0 trap on the standard models.
                 target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
+                
                 model = genai.GenerativeModel(target_model)
                 
                 prompt = f"""
@@ -297,6 +311,7 @@ with tab_macro:
                 return response.text
                 
             except Exception as e:
+                # 3. THE ULTIMATE DIAGNOSTIC
                 try:
                     debug_models = [m.name for m in genai.list_models()]
                     return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
@@ -312,8 +327,7 @@ with tab_macro:
         </div>
         """, unsafe_allow_html=True)
 
-    except Exception as e: 
-        pass
+    except Exception as e: pass
 
 # --- TAB 2: SNIPER SAFE ZONES ---
 with tab_safezone:
@@ -509,6 +523,7 @@ with tab_safezone:
 
 # --- TAB 3: TRADE BOOK ---
 with tab_ledger:
+    
     df_j = st.session_state.journal
     
     st.markdown("""
@@ -527,7 +542,6 @@ with tab_ledger:
     </div>
     """, unsafe_allow_html=True)
     
-    # Base Realized Metric Filtering
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
     total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
     
@@ -549,17 +563,13 @@ with tab_ledger:
                 capital_at_risk += abs(strike - long_strike) * 100 * qty
             else:
                 capital_at_risk += strike * 100 * qty
-        except: 
-            pass
-            
-    # Dynamic Weekly Tracking Core
+        except: pass
+        
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
-    
-    temp_dates = pd.to_datetime(df_j['Date'], errors='coerce').dt.date
-    
-    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week) & (~df_j["Status"].str.contains("Open", na=False))]
+    temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
     if not this_week_df.empty and this_week_df["Premium"].max() > 0:
@@ -574,7 +584,6 @@ with tab_ledger:
     else:
         top_loser_str = "Loser: N/A"
     
-    # Rendering Metrics Panel
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
     k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
@@ -596,7 +605,7 @@ with tab_ledger:
             n_qt = l4.number_input("Qty", value=1, min_value=1)
             
             l5, l6, l7 = st.columns(3)
-            n_st = l5.number_input("Strike (Sell)", value=None, format="%.1f", placeholder="e.g. 150")
+            n_st = l5.number_input("Strike (Sell)", value=None, format="%.1f", placeholder="e.g. 150.5")
             n_ls = l6.number_input("Long Strike (Buy)", value=None, format="%.1f", placeholder="(Optional for Spreads)")
             n_op = l7.number_input("Net Premium", value=None, format="%.2f", placeholder="e.g. 0.85")
             
