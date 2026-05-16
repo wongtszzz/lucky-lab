@@ -37,9 +37,9 @@ st.markdown("""
 # Central Data Definitions
 COLS = ["Date", "Ticker", "Type", "Strike", "Long Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
-# GitHub API Configuration
+# GitHub API Configuration 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
-REPO_NAME = st.secrets["REPO_NAME"]
+REPO_NAME = st.secrets["GITHUB_REPO"]  
 FILE_PATH = "options_journal.csv"
 
 try:
