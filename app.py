@@ -116,16 +116,27 @@ def refresh_calculations(current_df):
         try: ex_d = pd.to_datetime(r["Expiry"]).date()
         except: ex_d = datetime.now().date()
         
-        if close_p > 0: 
+        # --- AUTOMATED DATE SWAP INJECTION ---
+        # If a close price is entered but the status is still marked as active/open,
+        # it means the user just closed it right now. Stamp Expiry with today's date!
+        if close_p > 0 and "Open" in current_status:
+            r["Expiry"] = str(datetime.now().date())
+            ex_d = datetime.now().date()
+            s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
+        elif close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
         elif "Open" in current_status and ex_d < datetime.now().date(): 
             s = "Expired (Win)"
         else: 
             s = current_status if current_status.strip() != "nan" and current_status.strip() != "" else "Open / Active"
             
-        return pd.Series([p, s])
+        return pd.Series([p, s, r["Expiry"]])
         
-    current_df[["Premium", "Status"]] = current_df.apply(update_row, axis=1)
+    res = current_df.apply(update_row, axis=1)
+    current_df["Premium"] = res[0]
+    current_df["Status"] = res[1]
+    current_df["Expiry"] = res[2]
+    
     return sort_ledger(current_df)
 
 def save_journal(df):
@@ -568,9 +579,13 @@ with tab_ledger:
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday()) 
     end_of_week = start_of_week + timedelta(days=6) 
+    
     temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
-    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
+    
+    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week) & (~df_j["Status"].str.contains("Open", na=False))]
+    
     weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
+    # ----------------------------------------
     
     if not this_week_df.empty and this_week_df["Premium"].max() > 0:
         top_win_idx = this_week_df["Premium"].idxmax()
@@ -605,7 +620,7 @@ with tab_ledger:
             n_qt = l4.number_input("Qty", value=1, min_value=1)
             
             l5, l6, l7 = st.columns(3)
-            n_st = l5.number_input("Strike (Sell)", value=None, format="%.1f", placeholder="e.g. 150.5")
+            n_st = l5.number_input("Strike (Sell)", value=None, format="%.1f", placeholder="e.g. 150")
             n_ls = l6.number_input("Long Strike (Buy)", value=None, format="%.1f", placeholder="(Optional for Spreads)")
             n_op = l7.number_input("Net Premium", value=None, format="%.2f", placeholder="e.g. 0.85")
             
