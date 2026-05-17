@@ -534,6 +534,8 @@ with tab_ledger:
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
     start_of_month = today.replace(day=1)
+    
+    current_year = today.year
     start_of_year = today.replace(month=1, day=1)
     
     # Premium Calculations
@@ -543,7 +545,7 @@ with tab_ledger:
     
     # Projection Math
     day_of_year = today.timetuple().tm_yday
-    trading_days_passed = day_of_year * (252/365)
+    trading_days_passed = max(1, day_of_year * (252/365)) # protect from zero division
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
     # --- ROW 1: PREMIUMS & CREED ---
@@ -552,12 +554,11 @@ with tab_ledger:
     with r1c1:
         st.markdown(f"""
         <div class="dash-card">
-            <div class="dash-title">Premiums Summary</div>
+            <div class="dash-title">Premiums</div>
             <div class="dash-metric-row">
-                <span class="dash-metric-label">Week {today.isocalendar()[1]}</span>
+                <span class="dash-metric-label">This Week P&L</span>
                 <span class="dash-metric-green">${weekly_p:,.0f}</span>
             </div>
-            <div class="dash-subtext">Avg DTE: 45d | Active: {len(df_j[df_j["Status"].str.contains("Open", na=False)])} trades</div>
             
             <div class="dash-metric-row">
                 <span class="dash-metric-label">{today.strftime('%B')} (MTD)</span>
@@ -565,7 +566,7 @@ with tab_ledger:
             </div>
             
             <div class="dash-metric-row" style="margin-top: 15px;">
-                <span class="dash-metric-label">2026 YTD</span>
+                <span class="dash-metric-label">{current_year} YTD</span>
                 <span class="dash-metric-green" style="font-size: 1.2em;">${ytd_p:,.0f}</span>
             </div>
             
@@ -579,15 +580,16 @@ with tab_ledger:
     with r1c2:
         st.markdown("""
         <div class="dash-card">
-            <div class="dash-title">The Quants Creed</div>
+            <div class="dash-title">🧠 The Quants Creed</div>
             <div class="creed-text">
-                I am a long-term buy-and-hold investor first, and I use simple options as a tool to generate income and improve entries, not to speculate.<br><br>
-                <span class="creed-highlight">The 3 Emergency Protocols:</span><br>
-                • <b>Cut:</b> Take the 200% - 300% mechanical loss. No hesitation.<br>
-                • <b>Roll:</b> Roll out in time, but only for a net credit.<br>
-                • <b>Hold:</b> Wait it out, accepting the max loss risk if conviction remains.<br><br>
-                <span class="creed-highlight">Execution Rules:</span><br>
-                Target 45-DTE. Close trades at 60%-75% profit. Do not hold into the final 20 days (Gamma risk destroys Theta gains). Stay focused on quality companies, patience, and consistency over hype.
+                <b>3 Emergency Protocols - when the market goes against you:</b><br>
+                <b>Cut:</b> Take the 200% - 300% mechanical loss. No hesitation.<br>
+                <b>Roll:</b> Roll out in time, but only for a net credit.<br>
+                <b>Hold:</b> Best is to wait it out and accept you could lose the entire (spread - premium).<br><br>
+                <b>The 45-DTE Golden Rules:</b><br>
+                🎯 Close trades when hitting 60% - 75% profit.<br>
+                ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE)<br>
+                ⚠️ Do not hold into the final 20 days — Gamma risk will destroy your steady Theta gains.
             </div>
         </div>
         """, unsafe_allow_html=True)
