@@ -536,7 +536,7 @@ with tab_ledger:
     current_year = today.year
     start_of_year = today.replace(month=1, day=1)
     
-    # Advanced Realization Mapping (Locks accurate execution dates for MTD/YTD timelines)
+    # Advanced Realization Mapping
     def calculate_realization_date(row):
         try:
             status_str = str(row['Status'])
@@ -575,11 +575,10 @@ with tab_ledger:
     trading_days_passed = max(1, day_of_year * (252/365))
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
-    # Dynamic Formatting Helper for proper signs and colors
+    # Dynamic Formatting Helper (FIXED: Strips minus sign entirely, uses color to denote win/loss)
     def fmt_money(val):
         color = "dash-metric-green" if val >= 0 else "dash-metric-red"
-        sign = "" if val >= 0 else "-"
-        text = f"{sign}${abs(val):,.0f}"
+        text = f"${abs(val):,.0f}"
         return color, text
 
     wk_col, wk_str = fmt_money(weekly_p)
