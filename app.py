@@ -113,7 +113,6 @@ def refresh_calculations(current_df):
         current_status = str(r.get("Status", "Open / Active"))
         
         p = round(((open_p - close_p) * 100 * qty) - comm, 2)
-        # If it's a LEAPS call (buying), it should reflect as a debit if open, but calculating profit properly on close
         if "LEAPS Call" in str(r.get("Type", "")):
             p = round(((close_p - open_p) * 100 * qty) - comm, 2)
         
@@ -122,12 +121,11 @@ def refresh_calculations(current_df):
         
         if close_p > 0: 
             s = "Closed (Loss)" if close_p > open_p else "Closed (Win)"
-            # Flip logic for LEAPS since closing higher is a win
             if "LEAPS Call" in str(r.get("Type", "")):
                  s = "Closed (Win)" if close_p > open_p else "Closed (Loss)"
         elif "Open" in current_status and ex_d < datetime.now().date(): 
             s = "Expired (Win)"
-            if "LEAPS Call" in str(r.get("Type", "")): s = "Expired (Loss)" # LEAPS expire worthless if not sold
+            if "LEAPS Call" in str(r.get("Type", "")): s = "Expired (Loss)"
         else: 
             s = current_status if current_status.strip() != "nan" and current_status.strip() != "" else "Open / Active"
             
@@ -528,7 +526,7 @@ with tab_ledger:
     
     # --- DATA PROCESSING ---
     df_j['temp_date'] = pd.to_datetime(df_j['Date'], errors='coerce')
-    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
+    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)].copy()
     
     # Time Filters
     today = datetime.now().date()
@@ -538,14 +536,43 @@ with tab_ledger:
     current_year = today.year
     start_of_year = today.replace(month=1, day=1)
     
-    # Premium Calculations
-    weekly_p = realized_df[realized_df['temp_date'].dt.date >= start_of_week]["Premium"].sum() if not realized_df.empty else 0.0
-    monthly_p = realized_df[realized_df['temp_date'].dt.date >= start_of_month]["Premium"].sum() if not realized_df.empty else 0.0
-    ytd_p = realized_df[realized_df['temp_date'].dt.date >= start_of_year]["Premium"].sum() if not realized_df.empty else 0.0
+    # Advanced Realization Mapping (Locks accurate execution dates for MTD/YTD timelines)
+    def calculate_realization_date(row):
+        try:
+            status_str = str(row['Status'])
+            opened_dt = pd.to_datetime(row['Date']).date()
+            expiry_dt = pd.to_datetime(row['Expiry']).date()
+            if "Expired" in status_str:
+                return expiry_dt
+            elif "Closed" in status_str:
+                if expiry_dt <= today:
+                    return expiry_dt
+                return opened_dt
+            return opened_dt
+        except:
+            return today
+
+    if not realized_df.empty:
+        realized_df['realized_date'] = realized_df.apply(calculate_realization_date, axis=1)
+        weekly_p = realized_df[realized_df['realized_date'] >= start_of_week]["Premium"].sum()
+        monthly_p = realized_df[realized_df['realized_date'] >= start_of_month]["Premium"].sum()
+        ytd_p = realized_df[realized_df['realized_date'] >= start_of_year]["Premium"].sum()
+    else:
+        weekly_p, monthly_p, ytd_p = 0.0, 0.0, 0.0
+    
+    # Portfolio Metadata Metrics
+    valid_dte_df = df_j.copy()
+    valid_dte_df['t_open'] = pd.to_datetime(valid_dte_df['Date'], errors='coerce')
+    valid_dte_df['t_exp'] = pd.to_datetime(valid_dte_df['Expiry'], errors='coerce')
+    valid_dte_df['dte'] = (valid_dte_df['t_exp'] - valid_dte_df['t_open']).dt.days
+    avg_dte = valid_dte_df['dte'].mean() if not valid_dte_df['dte'].dropna().empty else 0.0
+    
+    day_of_year = today.timetuple().tm_yday
+    weeks_passed = max(1, day_of_year / 7)
+    avg_weekly_p = ytd_p / weeks_passed
     
     # Projection Math
-    day_of_year = today.timetuple().tm_yday
-    trading_days_passed = max(1, day_of_year * (252/365)) # protect from zero division
+    trading_days_passed = max(1, day_of_year * (252/365))
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
     # --- ROW 1: PREMIUMS & CREED ---
@@ -554,10 +581,15 @@ with tab_ledger:
     with r1c1:
         st.markdown(f"""
         <div class="dash-card">
-            <div class="dash-title">Premiums</div>
-            <div class="dash-metric-row">
-                <span class="dash-metric-label">This Week P&L</span>
+            <div class="dash-title">🤑 Premiums</div>
+            
+            <div class="dash-metric-row" style="margin-bottom: 2px;">
+                <span class="dash-metric-label">This Week</span>
                 <span class="dash-metric-green">${weekly_p:,.0f}</span>
+            </div>
+            <div class="dash-metric-row" style="margin-bottom: 15px;">
+                <span class="dash-metric-label" style="font-size: 0.82em; font-style: italic; color: #8B949E;">Avg DTE: {avg_dte:.1f} days</span>
+                <span class="dash-metric-val" style="font-size: 0.82em; color: #8B949E; text-align: right;">Avg Weekly: ${avg_weekly_p:,.0f}</span>
             </div>
             
             <div class="dash-metric-row">
@@ -570,7 +602,7 @@ with tab_ledger:
                 <span class="dash-metric-green" style="font-size: 1.2em;">${ytd_p:,.0f}</span>
             </div>
             
-            <div class="dash-metric-row" style="border-top: 1px dashed #2D3342; padding-top: 10px;">
+            <div class="dash-metric-row" style="border-top: 1px dashed #2D3342; padding-top: 10px; margin-top: 15px;">
                 <span class="dash-metric-label">Year-End Projection</span>
                 <span class="dash-metric-val">${projected_p:,.0f}</span>
             </div>
@@ -602,7 +634,6 @@ with tab_ledger:
     with r2c1:
         st.markdown('<div class="dash-card"><div class="dash-title">Ticker Breakdown (Realized)</div>', unsafe_allow_html=True)
         if not realized_df.empty:
-            # Categorize trades
             def get_cat(t):
                 if "Covered Call" in str(t): return "Covered Call"
                 elif "Put" in str(t): return "PUT"
@@ -612,7 +643,6 @@ with tab_ledger:
             realized_df["Category"] = realized_df["Type"].apply(get_cat)
             pivot_df = realized_df.pivot_table(index="Ticker", columns="Category", values="Premium", aggfunc="sum").fillna(0)
             
-            # Ensure columns exist
             for col in ["Covered Call", "PUT", "LEAPS"]:
                 if col not in pivot_df.columns: pivot_df[col] = 0.0
                 
@@ -741,7 +771,7 @@ with tab_ledger:
                     comm = round(n_qt * comm_rate, 2)
                     
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
-                    if n_ty == "LEAPS Call": net = -abs(net) # LEAPS purchase is a debit
+                    if n_ty == "LEAPS Call": net = -abs(net)
                     
                     stat = "Open / Active"
                     if n_ex < datetime.now().date(): stat = "Expired (Win)"
