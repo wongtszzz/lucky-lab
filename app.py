@@ -575,6 +575,19 @@ with tab_ledger:
     trading_days_passed = max(1, day_of_year * (252/365))
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
+    # Dynamic Formatting Helper for proper signs and colors
+    def fmt_money(val):
+        color = "dash-metric-green" if val >= 0 else "dash-metric-red"
+        sign = "" if val >= 0 else "-"
+        text = f"{sign}${abs(val):,.0f}"
+        return color, text
+
+    wk_col, wk_str = fmt_money(weekly_p)
+    mo_col, mo_str = fmt_money(monthly_p)
+    ytd_col, ytd_str = fmt_money(ytd_p)
+    proj_col, proj_str = fmt_money(projected_p)
+    avg_wk_col, avg_wk_str = fmt_money(avg_weekly_p)
+
     # --- ROW 1: PREMIUMS & CREED ---
     r1c1, r1c2 = st.columns([1, 2])
     
@@ -585,26 +598,26 @@ with tab_ledger:
             
             <div class="dash-metric-row" style="margin-bottom: 2px;">
                 <span class="dash-metric-label">This Week</span>
-                <span class="dash-metric-green">${weekly_p:,.0f}</span>
+                <span class="{wk_col}">{wk_str}</span>
             </div>
             <div class="dash-metric-row" style="margin-bottom: 15px;">
                 <span class="dash-metric-label" style="font-size: 0.82em; font-style: italic; color: #8B949E;">Avg DTE: {avg_dte:.1f} days</span>
-                <span class="dash-metric-val" style="font-size: 0.82em; color: #8B949E; text-align: right;">Avg Weekly: ${avg_weekly_p:,.0f}</span>
+                <span class="{avg_wk_col}" style="font-size: 0.82em; text-align: right;">Avg Weekly: {avg_wk_str}</span>
             </div>
             
             <div class="dash-metric-row">
                 <span class="dash-metric-label">{today.strftime('%B')} (MTD)</span>
-                <span class="dash-metric-green">${monthly_p:,.0f}</span>
+                <span class="{mo_col}">{mo_str}</span>
             </div>
             
             <div class="dash-metric-row" style="margin-top: 15px;">
                 <span class="dash-metric-label">{current_year} YTD</span>
-                <span class="dash-metric-green" style="font-size: 1.2em;">${ytd_p:,.0f}</span>
+                <span class="{ytd_col}" style="font-size: 1.2em;">{ytd_str}</span>
             </div>
             
             <div class="dash-metric-row" style="border-top: 1px dashed #2D3342; padding-top: 10px; margin-top: 15px;">
                 <span class="dash-metric-label">Year-End Projection</span>
-                <span class="dash-metric-val">${projected_p:,.0f}</span>
+                <span class="{proj_col}">{proj_str}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
