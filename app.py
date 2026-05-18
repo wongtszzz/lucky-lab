@@ -276,14 +276,21 @@ with tab_macro:
 
         st.write("---")
         
+        # 🚨 THE FINAL, BULLETPROOF AI CHIEF ECONOMIST 🚨
         st.markdown("#### 🧠 AI Chief Economist Brief")
         
         @st.cache_data(ttl=3600) 
         def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # 1. Ask Google for the master list of approved models
                 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                # 2. Target the high-throughput FREE tier model by explicitly hunting for "lite"
+                # This completely bypasses the limit:0 trap on the standard models.
                 target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
+                
                 model = genai.GenerativeModel(target_model)
                 
                 prompt = f"""
@@ -310,6 +317,7 @@ with tab_macro:
                 return response.text
                 
             except Exception as e:
+                # 3. THE ULTIMATE DIAGNOSTIC
                 try:
                     debug_models = [m.name for m in genai.list_models()]
                     return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
@@ -523,24 +531,31 @@ with tab_safezone:
 with tab_ledger:
     df_j = st.session_state.journal.copy()
     
-    # --- DATA PROCESSING ---
-    df_j['temp_date'] = pd.to_datetime(df_j['Date'], errors='coerce')
-    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)].copy()
-    
     # Time Filters
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
     start_of_month = today.replace(day=1)
     current_year = today.year
     start_of_year = today.replace(month=1, day=1)
     
-    # Restored to use the simple trade 'Date' logic so your 'This Week' numbers are accurate to your ledger
+    # --- DATA PROCESSING ---
+    
+    # 1. This Week P&L (Based strictly on Expiry Date to capture what is closing this week)
+    temp_exp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce')
+    start_of_week_dt = pd.to_datetime(start_of_week)
+    end_of_week_dt = pd.to_datetime(end_of_week)
+    this_week_df = df_j[(temp_exp_dates >= start_of_week_dt) & (temp_exp_dates <= end_of_week_dt)]
+    weekly_p = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
+    
+    # 2. Month & YTD P&L (Based strictly on Open Date for realized trades to preserve accurate historical metrics)
+    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)].copy()
     if not realized_df.empty:
-        weekly_p = realized_df[realized_df['temp_date'].dt.date >= start_of_week]["Premium"].sum()
-        monthly_p = realized_df[realized_df['temp_date'].dt.date >= start_of_month]["Premium"].sum()
-        ytd_p = realized_df[realized_df['temp_date'].dt.date >= start_of_year]["Premium"].sum()
+        realized_df['temp_open_dt'] = pd.to_datetime(realized_df['Date'], errors='coerce').dt.date
+        monthly_p = realized_df[realized_df['temp_open_dt'] >= start_of_month]["Premium"].sum()
+        ytd_p = realized_df[realized_df['temp_open_dt'] >= start_of_year]["Premium"].sum()
     else:
-        weekly_p, monthly_p, ytd_p = 0.0, 0.0, 0.0
+        monthly_p, ytd_p = 0.0, 0.0
     
     # Portfolio Metadata Metrics
     valid_dte_df = df_j.copy()
@@ -670,10 +685,10 @@ with tab_ledger:
     with r2c2:
         st.markdown('<div class="dash-card"><div class="dash-title">Cumulative P&L (YTD)</div>', unsafe_allow_html=True)
         if not realized_df.empty:
-            chart_data = realized_df[realized_df['temp_date'].dt.date >= start_of_year].sort_values('temp_date').copy()
+            chart_data = realized_df[realized_df['temp_open_dt'] >= start_of_year].sort_values('temp_open_dt').copy()
             if not chart_data.empty:
                 chart_data['Cumulative'] = chart_data['Premium'].cumsum()
-                st.area_chart(chart_data.set_index('temp_date')['Cumulative'], color="#FF4B4B")
+                st.area_chart(chart_data.set_index('temp_open_dt')['Cumulative'], color="#FF4B4B")
             else:
                 st.caption("No trades closed this year yet.")
         else:
@@ -719,7 +734,7 @@ with tab_ledger:
 
     with r3c2:
         st.markdown('<div class="dash-card"><div class="dash-title">Top & Worst Performers (MTD)</div>', unsafe_allow_html=True)
-        mtd_df = realized_df[realized_df['temp_date'].dt.date >= start_of_month]
+        mtd_df = realized_df[realized_df['temp_open_dt'] >= start_of_month]
         if not mtd_df.empty:
             mtd_grouped = mtd_df.groupby("Ticker")["Premium"].sum().reset_index()
             mtd_grouped = mtd_grouped.sort_values("Premium", ascending=False)
@@ -783,7 +798,7 @@ with tab_ledger:
     # --- TRADE HISTORY ---
     st.write("### 📓 Raw Trade Ledger")
     
-    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
+    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank', 'temp_open_dt'], errors='ignore')
     
     edt = st.data_editor(
         display_df, 
