@@ -99,6 +99,11 @@ st.markdown("""
     
     .auto-risk-banner { background-color: #12141A; padding: 10px 15px; border-radius: 5px; border: 1px dashed #1E2128; margin-top: 10px; margin-bottom: 10px; text-align: center; color: #8C92A4;}
     .footer-right { position: fixed; bottom: 10px; right: 10px; color: #555; font-size: 0.75em; z-index: 1000; }
+
+    /* Stripe the 'Press Enter to submit form' hint visually while maintaining operation */
+    div[data-testid="stForm"] small {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -154,7 +159,6 @@ def refresh_calculations(current_df):
         comm = float(r["Commission"]) if pd.notna(r["Commission"]) else 0.0
         current_status = str(r.get("Status", "Open / Active"))
         
-        # Credit Basis Architecture: open trades reflect full premium collected
         p = round(((open_p - close_p) * 100 * qty) - comm, 2)
         
         try: ex_d = pd.to_datetime(r["Expiry"]).date()
@@ -215,6 +219,13 @@ if 'journal' not in st.session_state:
         st.toast("🧹 Auto-Sweep: Passed expiration dates executed on Credit P&L.", icon="✅")
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
+
+# Calculate the next upcoming Friday for quick weekly options entry defaults
+today_date = datetime.now().date()
+friday_delta = (4 - today_date.weekday()) % 7
+if friday_delta == 0:
+    friday_delta = 7
+default_weekly_expiry = today_date + timedelta(days=friday_delta)
 
 # --- 2. GLOBAL CACHED FETCHERS ---
 @st.cache_data(ttl=900)
@@ -341,7 +352,7 @@ with tab_safezone:
     
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
-    with c2: calc_ex = st.date_input("Target Expiry", datetime.now().date() + timedelta(days=45))
+    with c2: calc_ex = st.date_input("Target Expiry", default_weekly_expiry)
     with c3:
         st.write(""); st.write("")
         run_calc = st.button("🔬 Auto-Target Strikes", type="primary", use_container_width=True)
@@ -505,7 +516,6 @@ with tab_ledger:
     current_month_name = today.strftime("%B")
     current_week_num = datetime.now().isocalendar()[1]
     
-    # Process Slices based strictly on standard transaction 'Date'
     if not df_j.empty:
         df_j['parsed_open_date'] = pd.to_datetime(df_j['Date'], errors='coerce').dt.date
         df_j['parsed_expiry_date'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
@@ -524,12 +534,15 @@ with tab_ledger:
         ytd_df = df_j[pd.to_datetime(df_j['Date']).dt.year == current_year]
         ytd_profit = ytd_df["Premium"].sum()
         
-        # Structural Metrics Engine (DTE and Averages)
-        valid_dte_df = this_week_df.dropna(subset=['parsed_open_date', 'parsed_expiry_date'])
-        if not valid_dte_df.empty:
-            avg_dte = int((valid_dte_df['parsed_expiry_date'] - valid_dte_df['parsed_open_date']).dt.days.mean())
+        # Structural Metrics Engine (DTE and Averages) - Fixed Object Type Casting
+        open_datetimes = pd.to_datetime(this_week_df['Date'], errors='coerce')
+        expiry_datetimes = pd.to_datetime(this_week_df['Expiry'], errors='coerce')
+        valid_time_mask = open_datetimes.notna() & expiry_datetimes.notna()
+        
+        if valid_time_mask.any():
+            avg_dte = int((expiry_datetimes[valid_time_mask] - open_datetimes[valid_time_mask]).dt.days.mean())
         else:
-            avg_dte = 45 # Default engine fallback
+            avg_dte = 7 # Default engine weeklies tracking fallback
             
         unique_weeks = df_j['Date'].apply(lambda x: pd.to_datetime(x).isocalendar()[1]).nunique()
         avg_weekly_premium = ytd_profit / max(unique_weeks, 1)
@@ -538,7 +551,7 @@ with tab_ledger:
         days_elapsed = max((datetime.now().date() - datetime(current_year, 1, 1).date()).days, 1)
         ye_projection = (ytd_profit / days_elapsed) * 365
     else:
-        weekly_profit, mtd_profit, ytd_profit, avg_dte, avg_weekly_premium, ye_projection = 0.0, 0.0, 0.0, 45, 0.0, 0.0
+        weekly_profit, mtd_profit, ytd_profit, avg_dte, avg_weekly_premium, ye_projection = 0.0, 0.0, 0.0, 7, 0.0, 0.0
         this_week_df = pd.DataFrame()
 
     def fmt_money(val):
@@ -601,11 +614,10 @@ with tab_ledger:
 
     row2_col1, row2_col2 = st.columns(2)
     
-    # BOX 3: TICKER PERFORMANCE GRID (Cross-referenced to current week profit)
+    # BOX 3: TICKER PERFORMANCE GRID
     with row2_col1:
         st.markdown('<div class="card-title" style="margin-bottom: 5px;">Active Weekly Allocations</div>', unsafe_allow_html=True)
         if not this_week_df.empty:
-            # Build clean breakdown table metrics
             grid_records = []
             for ticker, group in this_week_df.groupby("Ticker"):
                 cc_val = group[group["Type"].astype(str).str.contains("Call", na=False)]["Premium"].sum()
@@ -614,7 +626,6 @@ with tab_ledger:
                 grid_records.append({"Ticker": ticker, "Covered Call": cc_val, "PUT": put_val, "Total Premium": total_val})
             
             grid_df = pd.DataFrame(grid_records)
-            # Append Total Cross-reference Check Row at the bottom
             total_row = pd.DataFrame([{"Ticker": "TOTAL", "Covered Call": grid_df["Covered Call"].sum(), "PUT": grid_df["PUT"].sum(), "Total Premium": grid_df["Total Premium"].sum()}])
             grid_df = pd.concat([grid_df, total_row], ignore_index=True)
             
@@ -634,7 +645,6 @@ with tab_ledger:
             st.markdown('<div class="card-title" style="margin-bottom: 5px;">📊 Market Rankings YTD</div>', unsafe_allow_html=True)
             live_benchmarks = get_market_rankings_ytd()
             
-            # Estimate structural baseline performance percent return against standard margin limits
             account_return_pct = (ytd_profit / 250000.0) * 100 if ytd_profit != 0 else 0.0
             
             for index_name, return_val in live_benchmarks.items():
@@ -674,7 +684,7 @@ with tab_ledger:
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3 = st.columns(3)
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
-            n_ex = l2.date_input("Expiry Date", datetime.now().date() + timedelta(days=45))
+            n_ex = l2.date_input("Expiry Date", default_weekly_expiry)
             n_qt = l3.number_input("Quantity", value=1, min_value=1)
             
             l4, l5, l6 = st.columns(3)
@@ -687,7 +697,6 @@ with tab_ledger:
             if submitted:
                 n_tk = _raw_tk.upper() if _raw_tk else None
                 if n_tk and n_st is not None and n_op is not None:
-                    # Single leg operational execution math engine ($1.05 per contract contract standard fee limits)
                     comm_rate = 1.05
                     comm = round(n_qt * comm_rate, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
