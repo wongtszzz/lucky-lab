@@ -15,85 +15,90 @@ from github import Github
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Money Lab", page_icon="🧪", layout="wide")
 
-# Custom Dark Terminal Stylesheet matching the Prototype
+# Institutional Fintech Dark Theme
 st.markdown("""
 <style>
-    /* Global changes */
-    .reportview-container { background: #0d0e12; }
+    /* Global Background Override */
+    .stApp { background-color: #0A0B0D; color: #D1D4DC; font-family: 'Inter', -apple-system, sans-serif; }
     
     /* Premium Dashboard Cards */
     .terminal-card {
-        background-color: #14161d;
-        border: 1px solid #222530;
-        border-radius: 10px;
-        padding: 20px;
+        background-color: #12141A;
+        border: 1px solid #1E2128;
+        border-radius: 8px;
+        padding: 24px;
         margin-bottom: 20px;
         height: 100%;
         min-height: 340px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .card-title {
         font-size: 0.85rem;
-        color: #707584;
+        color: #8C92A4;
         text-transform: uppercase;
-        letter-spacing: 1.5px;
-        font-weight: 700;
-        margin-bottom: 15px;
+        letter-spacing: 1px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #1E2128;
+        padding-bottom: 10px;
     }
     .main-metric {
-        font-size: 2.4rem;
-        font-weight: 800;
-        color: #00b09b;
-        margin-bottom: 2px;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #FFFFFF;
+        margin-bottom: 4px;
+        letter-spacing: -0.5px;
     }
     .sub-metric-row {
-        font-size: 0.82rem;
-        font-style: italic;
-        color: #a0a5b5;
-        margin-bottom: 15px;
+        font-size: 0.85rem;
+        color: #8C92A4;
+        margin-bottom: 20px;
         display: flex;
         justify-content: space-between;
     }
     .data-row {
         display: flex;
         justify-content: space-between;
-        padding: 8px 0;
-        border-bottom: 1px solid #1c1e27;
+        padding: 10px 0;
+        border-bottom: 1px solid #1A1C23;
         font-size: 0.95rem;
     }
     .data-row:last-child { border-bottom: none; }
-    .data-label { color: #989da9; }
-    .data-value { font-weight: 600; color: #ffffff; }
-    .data-value.positive { color: #00b09b; }
-    .data-value.neutral { color: #f39c12; }
+    .data-label { color: #8C92A4; font-weight: 500; }
+    .data-value { font-weight: 600; color: #FFFFFF; }
+    .data-value.positive { color: #00C805; } /* Classic Terminal Green */
+    .data-value.negative { color: #FF5000; } /* Classic Terminal Red */
+    .data-value.neutral { color: #F5B041; }
     
     /* Creed Box Customization */
     .creed-box { 
-        background-color: #14161d; 
-        border: 1px solid #222530; 
-        border-left: 6px solid #0052cc; 
-        border-radius: 10px; 
-        padding: 20px; 
+        background-color: #12141A; 
+        border: 1px solid #1E2128; 
+        border-left: 4px solid #2962FF; 
+        border-radius: 8px; 
+        padding: 24px; 
         height: 100%;
         min-height: 340px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
-    .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 12px; color: #0052cc; letter-spacing: 0.5px; text-transform: uppercase; }
-    .creed-text { font-size: 0.9rem; line-height: 1.6; color: #c0c5d5; }
+    .creed-title { font-weight: 700; font-size: 1rem; margin-bottom: 15px; color: #2962FF; letter-spacing: 1px; text-transform: uppercase; }
+    .creed-text { font-size: 0.9rem; line-height: 1.7; color: #B0B5C1; }
     
     /* Sniper Styles */
-    .sniper-box { background-color: #14161d; border: 1px solid #222530; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
-    .sniper-title { font-size: 0.85em; color: #707584; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-    .sniper-value { font-size: 1.8em; font-weight: bold; }
-    .put-color { color: #00b09b; }
-    .call-color { color: #ff4b4b; }
-    .neutral-color { color: #f39c12; }
+    .sniper-box { background-color: #12141A; border: 1px solid #1E2128; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-title { font-size: 0.85em; color: #8C92A4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .sniper-value { font-size: 1.8em; font-weight: 700; }
+    .put-color { color: #00C805; }
+    .call-color { color: #FF5000; }
+    .neutral-color { color: #F5B041; }
     
-    .target-box-put { background-color: rgba(0, 176, 155, 0.08); border-left: 5px solid #00b09b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
-    .target-box-call { background-color: rgba(255, 75, 75, 0.08); border-left: 5px solid #ff4b4b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
-    .target-title { font-size: 2.2em; font-weight: 900; margin: 0; }
-    .target-sub { margin: 5px 0 0 0; color: #989da9; font-size: 1.0em; }
+    .target-box-put { background-color: rgba(0, 200, 5, 0.05); border-left: 4px solid #00C805; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-box-call { background-color: rgba(255, 80, 0, 0.05); border-left: 4px solid #FF5000; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-title { font-size: 2.2em; font-weight: 800; margin: 0; }
+    .target-sub { margin: 5px 0 0 0; color: #8C92A4; font-size: 1.0em; }
     
-    .auto-risk-banner { background-color: #14161d; padding: 10px 15px; border-radius: 5px; border: 1px dashed #222530; margin-top: 10px; margin-bottom: 10px; text-align: center; }
-    .footer-right { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.8em; z-index: 1000; }
+    .auto-risk-banner { background-color: #12141A; padding: 10px 15px; border-radius: 5px; border: 1px dashed #1E2128; margin-top: 10px; margin-bottom: 10px; text-align: center; color: #8C92A4;}
+    .footer-right { position: fixed; bottom: 10px; right: 10px; color: #555; font-size: 0.75em; z-index: 1000; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -279,7 +284,7 @@ def get_market_rankings_ytd():
 tab_macro, tab_safezone, tab_ledger = st.tabs([
     "🌍 Macro Playbook", 
     "🎯 Sniper Safe Zones", 
-    "📓 Trade Book"
+    "📓 Trade Desk"
 ])
 
 # --- TAB 1: MACRO PLAYBOOK ---
@@ -453,8 +458,8 @@ with tab_safezone:
                     with col_s1:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">2. Price Action</div>
-                            <div style="color:#00b09b;"><b>S1:</b> ${s1:.2f} | <b>S2:</b> ${s2:.2f}</div>
-                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1:</b> ${r1:.2f} | <b>R2:</b> ${r2:.2f}</div>
+                            <div style="color:#00C805;"><b>S1:</b> ${s1:.2f} | <b>S2:</b> ${s2:.2f}</div>
+                            <div style="color:#FF5000; margin-top:5px;"><b>R1:</b> ${r1:.2f} | <b>R2:</b> ${r2:.2f}</div>
                             </div>""", unsafe_allow_html=True)
                     with col_s2:
                         st.markdown(f"""<div class="sniper-box">
@@ -464,15 +469,15 @@ with tab_safezone:
                     with col_s3:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">4. Options Walls</div>
-                            <div style="color:#00b09b;"><b>Put Wall:</b> {put_wall_str}</div>
-                            <div style="color:#ff4b4b; margin-top:5px;"><b>Call Wall:</b> {call_wall_str}</div>
+                            <div style="color:#00C805;"><b>Put Wall:</b> {put_wall_str}</div>
+                            <div style="color:#FF5000; margin-top:5px;"><b>Call Wall:</b> {call_wall_str}</div>
                             </div>""", unsafe_allow_html=True)
                     
                     st.write("---")
                     st.markdown("#### 🎯 Target Strikes")
                     c_tgt1, c_tgt2 = st.columns(2)
-                    c_tgt1.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00b09b;">🟢 TARGET PUT: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
-                    c_tgt2.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL: ${math_ceil:.2f}</div><div class="target-sub">Auto-Ceiling</div></div>""", unsafe_allow_html=True)
+                    c_tgt1.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00C805;">🟢 TARGET PUT: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
+                    c_tgt2.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #FF5000;">🔴 TARGET CALL: ${math_ceil:.2f}</div><div class="target-sub">Auto-Ceiling</div></div>""", unsafe_allow_html=True)
 
                     if not puts_data.empty:
                         st.write("---")
@@ -487,7 +492,7 @@ with tab_safezone:
                             st.dataframe(matrix_df.style.format({'Strike': '${:.2f}', 'Distance (%)': '{:.1f}%', 'Bid': '${:.2f}', 'Ask': '${:.2f}', 'Mid Premium': '${:.2f}', 'Open Interest': '{:,.0f}'}), use_container_width=True, hide_index=True)
             except Exception as e: st.error(f"Calculation Error: {e}")
 
-# --- TAB 3: TRADE BOOK ---
+# --- TAB 3: TRADE DESK ---
 with tab_ledger:
     df_j = st.session_state.journal
     
@@ -536,6 +541,16 @@ with tab_ledger:
         weekly_profit, mtd_profit, ytd_profit, avg_dte, avg_weekly_premium, ye_projection = 0.0, 0.0, 0.0, 45, 0.0, 0.0
         this_week_df = pd.DataFrame()
 
+    def fmt_money(val):
+        color = "data-value positive" if val >= 0 else "data-value negative"
+        text = f"${abs(val):,.0f}"
+        return color, text
+
+    wk_col, wk_str = fmt_money(weekly_profit)
+    mo_col, mo_str = fmt_money(mtd_profit)
+    ytd_col, ytd_str = fmt_money(ytd_profit)
+    proj_col, proj_str = fmt_money(ye_projection)
+
     # ----------------------------------------------------
     # THE 4-BOX STREAMLIT DASHBOARD TERMINAL LAYOUT
     # ----------------------------------------------------
@@ -545,23 +560,23 @@ with tab_ledger:
     with row1_col1:
         st.markdown(f"""
         <div class="terminal-card">
-            <div class="card-title">Premiums Strategy Desk</div>
-            <div class="main-metric">${weekly_profit:,.2f}</div>
+            <div class="card-title">🤑 Premiums</div>
+            <div class="main-metric">{wk_str}</div>
             <div class="sub-metric-row">
                 <span>Avg DTE: {avg_dte}d</span>
-                <span>Avg Weekly Premium: ${avg_weekly_premium:,.2f}</span>
+                <span>Avg Weekly Premium: ${avg_weekly_premium:,.0f}</span>
             </div>
             <div class="data-row">
-                <span class="data-label">{current_month_name} Production</span>
-                <span class="data-value positive">${mtd_profit:,.2f}</span>
+                <span class="data-label">{current_month_name} P&L</span>
+                <span class="{mo_col}">{mo_str}</span>
             </div>
             <div class="data-row">
-                <span class="data-label">{current_year} YTD Balance</span>
-                <span class="data-value positive">${ytd_profit:,.2f}</span>
+                <span class="data-label">{current_year} YTD</span>
+                <span class="{ytd_col}">{ytd_str}</span>
             </div>
             <div class="data-row">
                 <span class="data-label">Year-End Projection</span>
-                <span class="data-value neutral">${ye_projection:,.2f}</span>
+                <span class="{proj_col}">{proj_str}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -607,7 +622,7 @@ with tab_ledger:
                 'Covered Call': '${:,.2f}',
                 'PUT': '${:,.2f}',
                 'Total Premium': '${:,.2f}'
-            }).background_gradient(subset=['Total Premium'], cmap='BuGn', low=0.0, high=0.3), use_container_width=True, hide_index=True)
+            }).background_gradient(subset=['Total Premium'], cmap='Greens', low=0.0, high=0.3), use_container_width=True, hide_index=True)
         else:
             st.info("No options logged or active in the current weekly window cycle.")
 
@@ -626,12 +641,12 @@ with tab_ledger:
                 st.markdown(f"""
                 <div class="data-row">
                     <span class="data-label">{index_name}</span>
-                    <span class="data-value">+{return_val:.2f}%</span>
+                    <span class="data-value positive">+{return_val:.2f}%</span>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown(f"""
-            <div class="data-row" style="background: rgba(0, 176, 155, 0.06); border-radius: 4px; padding: 4px 6px;">
-                <span class="data-label" style="color: #00b09b; font-weight: bold;">Lucky Money Lab</span>
+            <div class="data-row" style="background: rgba(0, 200, 5, 0.06); border-radius: 4px; padding: 4px 6px;">
+                <span class="data-label" style="color: #00C805; font-weight: bold;">Lucky Money Lab</span>
                 <span class="data-value positive">+{account_return_pct:.2f}%</span>
             </div>
             """, unsafe_allow_html=True)
@@ -658,16 +673,16 @@ with tab_ledger:
     with st.expander("➕ Log New Trade Entry", expanded=True):
         with st.form("new_trade_form", clear_on_submit=True):
             l1, l2, l3 = st.columns(3)
-            _raw_tk = l1.text_input("Ticker Label", placeholder="e.g. TSLA")
-            n_ex = l2.date_input("Contract Expiry", datetime.now().date() + timedelta(days=45))
-            n_qt = l3.number_input("Contract Volume Qty", value=1, min_value=1)
+            _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
+            n_ex = l2.date_input("Expiry Date", datetime.now().date() + timedelta(days=45))
+            n_qt = l3.number_input("Quantity", value=1, min_value=1)
             
             l4, l5, l6 = st.columns(3)
-            n_ty = l4.selectbox("Execution Strategy Class", ["Short Put", "Covered Call"])
-            n_st = l5.number_input("Strike Target (Sell)", value=None, format="%.1f", placeholder="e.g. 150.0")
-            n_op = l6.number_input("Net Premium Captured Price", value=None, format="%.2f", placeholder="e.g. 1.45")
+            n_ty = l4.selectbox("Strategy", ["Short Put", "Covered Call"])
+            n_st = l5.number_input("Strike price", value=None, format="%.1f", placeholder="e.g. 150.0")
+            n_op = l6.number_input("Premium", value=None, format="%.2f", placeholder="e.g. 1.45")
             
-            submitted = st.form_submit_button("🚀 Commit Trade to Ledger Network", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("🚀 Commit Trade", use_container_width=True, type="primary")
             
             if submitted:
                 n_tk = _raw_tk.upper() if _raw_tk else None
@@ -690,7 +705,7 @@ with tab_ledger:
                     save_journal(st.session_state.journal)
                     st.rerun()
 
-    st.write("### Complete Trade History Ledger Block")
+    st.write("### Trade Ledger")
     
     display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank', 'parsed_open_date', 'parsed_expiry_date'], errors='ignore')
     
@@ -700,7 +715,7 @@ with tab_ledger:
         use_container_width=True, 
         key="ledger_final_locked",
         column_config={
-            "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD Setup"),
+            "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
             "Long Strike": st.column_config.NumberColumn(format="%.2f"),
             "Open Price": st.column_config.NumberColumn(format="%.2f"),
