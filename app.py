@@ -25,13 +25,12 @@ st.markdown("""
     /* Premium Dashboard Cards */
     .terminal-card {
         background-color: #12141A;
-        border: 1px solid #1E2128;
+        border: none;
         border-radius: 8px;
         padding: 24px;
         margin-bottom: 20px;
         height: 100%;
         min-height: 340px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .card-title {
         font-size: 0.85rem;
@@ -67,26 +66,24 @@ st.markdown("""
     .data-row:last-child { border-bottom: none; }
     .data-label { color: #8C92A4; font-weight: 500; }
     .data-value { font-weight: 600; color: #FFFFFF; }
-    .data-value.positive { color: #00C805; } /* Classic Terminal Green */
-    .data-value.negative { color: #FF5000; } /* Classic Terminal Red */
+    .data-value.positive { color: #00C805; } 
+    .data-value.negative { color: #FF5000; } 
     .data-value.neutral { color: #F5B041; }
     
     /* Creed Box Customization */
     .creed-box { 
         background-color: #12141A; 
-        border: 1px solid #1E2128; 
-        border-left: 4px solid #2962FF; 
+        border: none; 
         border-radius: 8px; 
         padding: 24px; 
         height: 100%;
         min-height: 340px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .creed-title { font-weight: 700; font-size: 1rem; margin-bottom: 15px; color: #2962FF; letter-spacing: 1px; text-transform: uppercase; }
     .creed-text { font-size: 0.9rem; line-height: 1.7; color: #B0B5C1; }
     
     /* Sniper Styles */
-    .sniper-box { background-color: #12141A; border: 1px solid #1E2128; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-box { background-color: #12141A; border: none; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
     .sniper-title { font-size: 0.85em; color: #8C92A4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
     .sniper-value { font-size: 1.8em; font-weight: 700; }
     .put-color { color: #00C805; }
@@ -104,10 +101,9 @@ st.markdown("""
     .auto-risk-banner { background-color: #12141A; padding: 10px 15px; border-radius: 5px; border: 1px dashed #1E2128; margin-top: 10px; margin-bottom: 10px; text-align: center; color: #8C92A4;}
     .footer-right { position: fixed; bottom: 10px; right: 10px; color: #555; font-size: 0.75em; z-index: 1000; }
 
-    /* Stripe the 'Press Enter to submit form' micro-copy layout visually while maintaining execution */
-    div[data-testid="stForm"] small {
-        display: none !important;
-    }
+    /* Stripe the 'Press Enter to submit form' micro-copy completely */
+    div[data-testid="stForm"] small { display: none !important; }
+    div[data-testid="InputInstructions"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,7 +126,7 @@ except Exception as e:
     st.stop()
 
 FILE_PATH = "lucky_ledger.csv"
-COLS = ["Date", "Ticker", "Type", "Strike", "Long Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
+COLS = ["Date", "Ticker", "Type", "Strike", "Expiry", "Open Price", "Close Price", "Qty", "Commission", "Premium", "Status"]
 
 def sort_ledger(df):
     if df.empty: return df
@@ -149,11 +145,8 @@ def sort_ledger(df):
 def refresh_calculations(current_df):
     if current_df.empty: return current_df
     current_df = current_df.copy()
-    
-    if "Long Strike" not in current_df.columns:
-        current_df["Long Strike"] = 0.0
         
-    for col in ["Strike", "Long Strike", "Open Price", "Close Price", "Qty", "Commission"]:
+    for col in ["Strike", "Open Price", "Close Price", "Qty", "Commission"]:
         current_df[col] = pd.to_numeric(current_df[col], errors='coerce').fillna(0)
         
     def update_row(r):
@@ -163,7 +156,6 @@ def refresh_calculations(current_df):
         comm = float(r["Commission"]) if pd.notna(r["Commission"]) else 0.0
         current_status = str(r.get("Status", "Open / Active"))
         
-        # Credit Basis Architecture: open trades reflect full premium collected
         p = round(((open_p - close_p) * 100 * qty) - comm, 2)
         
         try: ex_d = pd.to_datetime(r["Expiry"]).date()
@@ -200,10 +192,13 @@ def load_journal():
         decoded_content = base64.b64decode(contents.content).decode('utf-8')
         raw_df = pd.read_csv(io.StringIO(decoded_content))
         
+        # Cleanup routine to ditch the old Long Strike column if it exists in the raw CSV
+        if 'Long Strike' in raw_df.columns:
+            raw_df = raw_df.drop(columns=['Long Strike'])
+        
         for c in COLS:
             if c not in raw_df.columns:
                 if c == "Date": raw_df[c] = datetime.now().strftime("%Y-%m-%d")
-                elif c == "Long Strike": raw_df[c] = 0.0
                 else: raw_df[c] = 0.0 if c in ["Open Price", "Close Price", "Premium", "Commission"] else (1 if c == "Qty" else "Unknown")
         
         original_open = len(raw_df[raw_df['Status'].astype(str).str.contains('Open', na=False)])
@@ -345,20 +340,14 @@ with tab_macro:
 
         st.write("---")
         
-        # 🚨 THE FINAL, BULLETPROOF AI CHIEF ECONOMIST 🚨
         st.markdown("#### 🧠 AI Chief Economist Brief")
         
         @st.cache_data(ttl=3600) 
         def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
             try:
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                
-                # 1. Ask Google for the master list of approved models
                 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                
-                # 2. Target the high-throughput FREE tier model by explicitly hunting for "lite"
                 target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
-                
                 model = genai.GenerativeModel(target_model)
                 
                 prompt = f"""
@@ -372,20 +361,13 @@ with tab_macro:
                 Format your response in exactly 3 short, punchy sections using Markdown. Do not use filler words.
                 
                 ### 🌍 The Current Regime
-                (Synthesize what these specific metrics mean together right now. Identify if it is risk-on, risk-off, a divergent top, or oversold capitulation).
-                
                 ### 📰 The Forward Look
-                (Based on these metrics, what macroeconomic themes or breaking points should the desk watch out for in the coming days).
-                
                 ### 🎯 Option Seller Action Plan
-                (Give specific tactical advice. Should we sell 45-DTE Puts? Switch to Call Credit Spreads? Avoid weeklies? Be definitive).
                 """
-                
                 response = model.generate_content(prompt)
                 return response.text
                 
             except Exception as e:
-                # 3. THE ULTIMATE DIAGNOSTIC
                 try:
                     debug_models = [m.name for m in genai.list_models()]
                     return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
@@ -393,7 +375,7 @@ with tab_macro:
                     return f"⚠️ **AI Engine Offline.** Error details: {e}"
 
         with st.spinner("Chief Economist is analyzing the live data..."):
-            ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, breadth_avg)
+            ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, s5tw_pct)
             
         st.markdown(f"""
         <div class="synthesis-box">
@@ -611,8 +593,8 @@ with tab_ledger:
         avg_weekly_premium = ytd_profit / max(unique_weeks, 1)
         
         # Year-End Projection Math Model
-        days_elapsed = max((datetime.now().date() - datetime(current_year, 1, 1).date()).days, 1)
-        ye_projection = (ytd_profit / days_elapsed) * 365
+        days_elapsed_ytd = max((datetime.now().date() - datetime(current_year, 1, 1).date()).days, 1)
+        ye_projection = (ytd_profit / days_elapsed_ytd) * 365
     else:
         weekly_profit, mtd_profit, ytd_profit, avg_dte, avg_weekly_premium, ye_projection = 0.0, 0.0, 0.0, 7, 0.0, 0.0
         this_week_df = pd.DataFrame()
@@ -677,27 +659,61 @@ with tab_ledger:
 
     row2_col1, row2_col2 = st.columns(2)
     
-    # BOX 3: TICKER PERFORMANCE GRID
+    # BOX 3: TICKER PERFORMANCE GRID (With Time Decay Progress Bar)
     with row2_col1:
-        st.markdown('<div class="card-title" style="margin-bottom: 5px;">Active Weekly Allocations</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-title" style="margin-bottom: 5px;">Active Weekly</div>', unsafe_allow_html=True)
         if not this_week_df.empty:
             grid_records = []
             for ticker, group in this_week_df.groupby("Ticker"):
                 cc_val = group[group["Type"].astype(str).str.contains("Call", na=False)]["Premium"].sum()
                 put_val = group[group["Type"].astype(str).str.contains("Put", na=False)]["Premium"].sum()
                 total_val = cc_val + put_val
-                grid_records.append({"Ticker": ticker, "Covered Call": cc_val, "PUT": put_val, "Total Premium": total_val})
+                
+                # Progress calculation (Time Decay over 5 days)
+                min_date = group['parsed_open_date'].min()
+                days_elapsed = (datetime.now().date() - min_date).days
+                progress_pct = min(max((days_elapsed / 5.0) * 100, 0.0), 100.0)
+                
+                grid_records.append({
+                    "Ticker": ticker, 
+                    "Covered Call": cc_val if cc_val != 0 else None, 
+                    "PUT": put_val if put_val != 0 else None, 
+                    "Total Premium": total_val if total_val != 0 else None,
+                    "Time Decay": progress_pct
+                })
             
             grid_df = pd.DataFrame(grid_records)
-            total_row = pd.DataFrame([{"Ticker": "TOTAL", "Covered Call": grid_df["Covered Call"].sum(), "PUT": grid_df["PUT"].sum(), "Total Premium": grid_df["Total Premium"].sum()}])
+            
+            total_cc = grid_df["Covered Call"].sum()
+            total_put = grid_df["PUT"].sum()
+            total_prem = grid_df["Total Premium"].sum()
+            
+            total_row = pd.DataFrame([{
+                "Ticker": "TOTAL", 
+                "Covered Call": total_cc if total_cc != 0 else None, 
+                "PUT": total_put if total_put != 0 else None, 
+                "Total Premium": total_prem if total_prem != 0 else None,
+                "Time Decay": None
+            }])
             grid_df = pd.concat([grid_df, total_row], ignore_index=True)
             
-            # Using highlight_max to cleanly bypass matplotlib dependency issues in the cloud server
-            st.dataframe(grid_df.style.format({
-                'Covered Call': '${:,.2f}',
-                'PUT': '${:,.2f}',
-                'Total Premium': '${:,.2f}'
-            }).highlight_max(subset=['Total Premium'], color='rgba(0,200,5,0.15)'), use_container_width=True, hide_index=True)
+            st.dataframe(
+                grid_df,
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "Covered Call": st.column_config.NumberColumn(format="$%.2f"),
+                    "PUT": st.column_config.NumberColumn(format="$%.2f"),
+                    "Total Premium": st.column_config.NumberColumn(format="$%.2f"),
+                    "Time Decay": st.column_config.ProgressColumn(
+                        "Time Decay",
+                        help="Time passed across a 5-day trading window",
+                        format="%.0f%%",
+                        min_value=0,
+                        max_value=100
+                    )
+                }
+            )
         else:
             st.info("No options logged or active in the current weekly window cycle.")
 
@@ -706,24 +722,24 @@ with tab_ledger:
         sub_left, sub_right = st.columns(2)
         
         with sub_left:
-            st.markdown('<div class="card-title" style="margin-bottom: 5px;">📊 Market Rankings YTD</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-title" style="margin-bottom: 5px;">🏎️ Market Rankings YTD</div>', unsafe_allow_html=True)
             live_benchmarks = get_market_rankings_ytd()
             
             account_return_pct = (ytd_profit / 250000.0) * 100 if ytd_profit != 0 else 0.0
             
-            for index_name, return_val in live_benchmarks.items():
+            # Inject your portfolio as a standard row to participate in the sort
+            live_benchmarks["Lucky Lab 🧪"] = account_return_pct
+            
+            # Sort from Highest to Lowest
+            sorted_rankings = sorted(live_benchmarks.items(), key=lambda item: item[1], reverse=True)
+            
+            for index_name, return_val in sorted_rankings:
                 st.markdown(f"""
                 <div class="data-row">
                     <span class="data-label">{index_name}</span>
                     <span class="data-value positive">+{return_val:.2f}%</span>
                 </div>
                 """, unsafe_allow_html=True)
-            st.markdown(f"""
-            <div class="data-row" style="background: rgba(0, 200, 5, 0.06); border-radius: 4px; padding: 4px 6px;">
-                <span class="data-label" style="color: #00C805; font-weight: bold;">Lucky Money Lab</span>
-                <span class="data-value positive">+{account_return_pct:.2f}%</span>
-            </div>
-            """, unsafe_allow_html=True)
             
         with sub_right:
             st.markdown('<div class="card-title" style="margin-bottom: 5px;">🏆 Top 5 Performers</div>', unsafe_allow_html=True)
@@ -770,11 +786,10 @@ with tab_ledger:
                     
                     new_row = pd.DataFrame([{
                         "Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, 
-                        "Strike": round(n_st, 1), "Long Strike": 0.0,
+                        "Strike": round(n_st, 1), 
                         "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
                         "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
                     }])
-                    # BUG FIX: Use st.session_state.journal directly to avoid copying over mutated columns from df_j
                     st.session_state.journal = sort_ledger(pd.concat([st.session_state.journal, new_row], ignore_index=True))
                     save_journal(st.session_state.journal)
                     st.rerun()
@@ -791,7 +806,6 @@ with tab_ledger:
         column_config={
             "Date": st.column_config.TextColumn("Date", help="YYYY-MM-DD"),
             "Strike": st.column_config.NumberColumn(format="%.2f"),
-            "Long Strike": st.column_config.NumberColumn(format="%.2f"),
             "Open Price": st.column_config.NumberColumn(format="%.2f"),
             "Close Price": st.column_config.NumberColumn(format="%.2f"),
             "Commission": st.column_config.NumberColumn(format="$%.2f"),
