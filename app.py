@@ -11,96 +11,53 @@ from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, St
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
+import google.generativeai as genai
 
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Money Lab", page_icon="🧪", layout="wide")
 
-# Institutional Fintech Dark Theme
 st.markdown("""
 <style>
-    /* Global Background Override */
-    .stApp { background-color: #0A0B0D; color: #D1D4DC; font-family: 'Inter', -apple-system, sans-serif; }
-    
-    /* Premium Dashboard Cards */
-    .terminal-card {
-        background-color: #12141A;
-        border: 1px solid #1E2128;
-        border-radius: 8px;
-        padding: 24px;
-        margin-bottom: 20px;
-        height: 100%;
-        min-height: 340px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-    .card-title {
-        font-size: 0.85rem;
-        color: #8C92A4;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-weight: 600;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #1E2128;
-        padding-bottom: 10px;
-    }
-    .main-metric {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #FFFFFF;
-        margin-bottom: 4px;
-        letter-spacing: -0.5px;
-    }
-    .sub-metric-row {
-        font-size: 0.85rem;
-        color: #8C92A4;
-        margin-bottom: 20px;
+    [data-testid="metric-container"] {
+        background-color: rgba(28, 131, 225, 0.05); 
+        border: 1px solid rgba(128, 128, 128, 0.15);
+        border-radius: 12px;
+        padding: 15px;
+        height: 140px; 
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        margin-bottom: 15px;
     }
-    .data-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px 0;
-        border-bottom: 1px solid #1A1C23;
-        font-size: 0.95rem;
-    }
-    .data-row:last-child { border-bottom: none; }
-    .data-label { color: #8C92A4; font-weight: 500; }
-    .data-value { font-weight: 600; color: #FFFFFF; }
-    .data-value.positive { color: #00C805; } /* Classic Terminal Green */
-    .data-value.negative { color: #FF5000; } /* Classic Terminal Red */
-    .data-value.neutral { color: #F5B041; }
+    [data-testid="stMetricValue"] { font-size: 2.2rem !important; font-weight: 800 !important; }
+    [data-testid="stMetricDelta"] { font-size: 0.95rem !important; color: #888888 !important; justify-content: center !important; }
+    [data-testid="stMetricDelta"] > svg { display: none; }
+    .footer-right { position: fixed; bottom: 10px; right: 10px; color: gray; font-size: 0.8em; z-index: 1000; }
     
-    /* Creed Box Customization */
-    .creed-box { 
-        background-color: #12141A; 
-        border: 1px solid #1E2128; 
-        border-left: 4px solid #2962FF; 
-        border-radius: 8px; 
-        padding: 24px; 
-        height: 100%;
-        min-height: 340px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-    .creed-title { font-weight: 700; font-size: 1rem; margin-bottom: 15px; color: #2962FF; letter-spacing: 1px; text-transform: uppercase; }
-    .creed-text { font-size: 0.9rem; line-height: 1.7; color: #B0B5C1; }
+    .creed-box { background-color: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 6px solid #2962FF; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px; }
+    .creed-title { font-weight: 800; font-size: 1.1em; margin-bottom: 10px; color: #2962FF; letter-spacing: 0.5px; }
+    .creed-text { font-size: 0.95em; line-height: 1.6; }
     
-    /* Sniper Styles */
-    .sniper-box { background-color: #12141A; border: 1px solid #1E2128; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
-    .sniper-title { font-size: 0.85em; color: #8C92A4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-    .sniper-value { font-size: 1.8em; font-weight: 700; }
-    .put-color { color: #00C805; }
-    .call-color { color: #FF5000; }
-    .neutral-color { color: #F5B041; }
+    .sniper-box { background-color: rgba(30, 30, 30, 0.5); border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-title { font-size: 0.85em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .sniper-value { font-size: 1.8em; font-weight: bold; }
+    .put-color { color: #00b09b; }
+    .call-color { color: #ff4b4b; }
+    .neutral-color { color: #f39c12; }
     
-    .target-box-put { background-color: rgba(0, 200, 5, 0.05); border-left: 4px solid #00C805; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
-    .target-box-call { background-color: rgba(255, 80, 0, 0.05); border-left: 4px solid #FF5000; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
-    .target-title { font-size: 2.2em; font-weight: 800; margin: 0; }
-    .target-sub { margin: 5px 0 0 0; color: #8C92A4; font-size: 1.0em; }
+    .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 20px; border-radius: 5px; margin-bottom: 20px;}
+    .synthesis-box h3 { margin-top: 0; font-size: 1.2em; color: #2962FF; }
     
-    .auto-risk-banner { background-color: #12141A; padding: 10px 15px; border-radius: 5px; border: 1px dashed #1E2128; margin-top: 10px; margin-bottom: 10px; text-align: center; color: #8C92A4;}
-    .footer-right { position: fixed; bottom: 10px; right: 10px; color: #555; font-size: 0.75em; z-index: 1000; }
+    .target-box-put { background-color: rgba(0, 176, 155, 0.1); border-left: 5px solid #00b09b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-box-call { background-color: rgba(255, 75, 75, 0.1); border-left: 5px solid #ff4b4b; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
+    .target-title { font-size: 2.2em; font-weight: 900; margin: 0; }
+    .target-sub { margin: 5px 0 0 0; color: #ccc; font-size: 1.1em; }
+    
+    .auto-risk-banner { background-color: rgba(255, 255, 255, 0.05); padding: 10px 15px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); margin-top: 10px; margin-bottom: 10px; text-align: center; }
 
-    /* Stripe the 'Press Enter to submit form' hint visually while maintaining operation */
+    /* Stripe the 'Press Enter to submit form' micro-copy layout visually while maintaining execution */
     div[data-testid="stForm"] small {
         display: none !important;
     }
@@ -216,11 +173,11 @@ if 'journal' not in st.session_state:
     
     if needs_auto_save:
         save_journal(st.session_state.journal)
-        st.toast("🧹 Auto-Sweep: Passed expiration dates executed on Credit P&L.", icon="✅")
+        st.toast("🧹 Auto-Sweep: Passed expiration dates detected. Trades marked as Expired and permanently moved to Realized P&L.", icon="✅")
 
 if 'current_vix' not in st.session_state: st.session_state.current_vix = 20.0
 
-# Calculate the next upcoming Friday for quick weekly options entry defaults
+# --- DYNAMIC CALCULATION FOR WEEKLY CYCLE DEFAULT DATES ---
 today_date = datetime.now().date()
 friday_delta = (4 - today_date.weekday()) % 7
 if friday_delta == 0:
@@ -275,27 +232,11 @@ def get_options_chain(ticker_str, exp_date):
         return chain.calls, chain.puts
     except: return pd.DataFrame(), pd.DataFrame()
 
-@st.cache_data(ttl=3600)
-def get_market_rankings_ytd():
-    indices = {"Nasdaq": "^IXIC", "Russell 2000": "^RUT", "S&P 500": "^GSPC", "Dow Jones": "^DJI"}
-    rankings = {}
-    for name, sym in indices.items():
-        try:
-            t = yf.Ticker(sym)
-            df = t.history(start="2026-01-01")
-            if not df.empty:
-                start_px = df['Close'].iloc[0]
-                end_px = df['Close'].iloc[-1]
-                rankings[name] = ((end_px - start_px) / start_px) * 100
-            else: rankings[name] = 0.0
-        except: rankings[name] = 0.0
-    return rankings
-
 # --- 3. UI TABS ---
 tab_macro, tab_safezone, tab_ledger = st.tabs([
     "🌍 Macro Playbook", 
     "🎯 Sniper Safe Zones", 
-    "📓 Trade Desk"
+    "📓 Trade Book"
 ])
 
 # --- TAB 1: MACRO PLAYBOOK ---
@@ -308,7 +249,7 @@ with tab_macro:
             st.cache_data.clear()
             st.rerun()
             
-    st.caption(f"Last API Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.caption(f"Last API Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (Pulls fresh data every 15 mins or on manual refresh)")
     
     try:
         oil_px, oil_pct = get_macro_live("CL=F")
@@ -332,11 +273,71 @@ with tab_macro:
         
         s5tw_pct, s5tw_up, s5tw_total = get_automated_breadth(sp500_sectors)
         nctw_pct, nctw_up, nctw_total = get_automated_breadth(nasdaq_leaders)
+        breadth_avg = (s5tw_pct + nctw_pct) / 2
         
         st.markdown("#### 📊 Market Breadth (Live 20-Day MA Proxies)")
         b1, b2 = st.columns(2)
         b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
         b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
+
+        st.write("---")
+        
+        # 🚨 THE FINAL, BULLETPROOF AI CHIEF ECONOMIST 🚨
+        st.markdown("#### 🧠 AI Chief Economist Brief")
+        
+        @st.cache_data(ttl=3600) 
+        def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
+            try:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                # 1. Ask Google for the master list of approved models
+                valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                # 2. Target the high-throughput FREE tier model by explicitly hunting for "lite"
+                # This completely bypasses the limit:0 trap on the standard models.
+                target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
+                
+                model = genai.GenerativeModel(target_model)
+                
+                prompt = f"""
+                You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
+                Write a morning macro brief based strictly on these live numbers:
+                - VIX: {vix:.2f}
+                - DXY (US Dollar): {dxy:.2f}
+                - WTI Crude Oil: ${oil:.2f}
+                - Market Breadth: {breadth_avg:.0f}% of stocks trending up.
+                
+                Format your response in exactly 3 short, punchy sections using Markdown. Do not use filler words.
+                
+                ### 🌍 The Current Regime
+                (Synthesize what these specific metrics mean together right now. Identify if it is risk-on, risk-off, a divergent top, or oversold capitulation).
+                
+                ### 📰 The Forward Look
+                (Based on these metrics, what macroeconomic themes or breaking points should the desk watch out for in the coming days).
+                
+                ### 🎯 Option Seller Action Plan
+                (Give specific tactical advice. Should we sell 45-DTE Puts? Switch to Call Credit Spreads? Avoid weeklies? Be definitive).
+                """
+                
+                response = model.generate_content(prompt)
+                return response.text
+                
+            except Exception as e:
+                # 3. THE ULTIMATE DIAGNOSTIC
+                try:
+                    debug_models = [m.name for m in genai.list_models()]
+                    return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
+                except:
+                    return f"⚠️ **AI Engine Offline.** Error details: {e}"
+
+        with st.spinner("Chief Economist is analyzing the live data..."):
+            ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, breadth_avg)
+            
+        st.markdown(f"""
+        <div class="synthesis-box">
+            {ai_brief}
+        </div>
+        """, unsafe_allow_html=True)
 
     except Exception as e: pass
 
@@ -346,9 +347,9 @@ with tab_safezone:
     
     c_tog1, c_tog2 = st.columns([3, 1])
     with c_tog1:
-        st.caption("Enter ticker and expiry to calculate structural support.")
+        st.caption("Enter ticker and expiry to calculate structural support. Matrix will load below.")
     with c_tog2:
-        dynamic_risk = st.checkbox("🛡️ Enable RSI Risk Shield", value=False)
+        dynamic_risk = st.checkbox("🛡️ Enable RSI Risk Shield", value=False, help="When checked, modifies risk multiplier based on Oversold/Overbought conditions. Leave unchecked to lock multiplier at 1.0 (Rigid/Riskier).")
     
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
@@ -390,7 +391,7 @@ with tab_safezone:
                             risk_status = f"🛡️ Shield ACTIVE: NEUTRAL (RSI: {live_rsi:.1f}). Risk Skew: 1.0x."
                     else:
                         put_mult, call_mult = 1.0, 1.0
-                        risk_status = f"⚠️ Shield OFF: Rigid 1.0x Multiplier applied."
+                        risk_status = f"⚠️ Shield OFF: Rigid 1.0x Multiplier applied regardless of RSI ({live_rsi:.1f})."
 
                     st.markdown(f"<div class='auto-risk-banner'>🤖 <b>Risk Engine:</b> {risk_status}</div>", unsafe_allow_html=True)
                     
@@ -398,13 +399,16 @@ with tab_safezone:
                     put_wall, call_wall = None, None
                     base_exp_move = 0.0
                     math_type_str = "Theoretical IV"
+                    
                     calls_data, puts_data = pd.DataFrame(), pd.DataFrame()
                     
                     try:
                         if avail_exps:
                             target_exp = calc_ex.strftime('%Y-%m-%d')
                             if target_exp not in avail_exps: target_exp = avail_exps[0]
+                            
                             calls_data, puts_data = get_options_chain(calc_tk, target_exp)
+                            
                             if not calls_data.empty and not puts_data.empty:
                                 closest_call = calls_data.iloc[(calls_data['strike'] - px).abs().argsort()[:1]]
                                 closest_put = puts_data.iloc[(puts_data['strike'] - px).abs().argsort()[:1]]
@@ -442,6 +446,7 @@ with tab_safezone:
                     poc_price = vol_profile.idxmax().mid
                     
                     snap_limit = base_exp_move * 0.75 
+                    
                     put_candidates = []
                     if math_floor - s1 >= 0 and (math_floor - s1) <= snap_limit: put_candidates.append((f"S1 ({lookback_days}d Low)", s1))
                     if math_floor - s2 >= 0 and (math_floor - s2) <= snap_limit: put_candidates.append((f"S2 ({macro_lookback}d Low)", s2))
@@ -451,13 +456,13 @@ with tab_safezone:
                     if put_candidates:
                         best_put = max(put_candidates, key=lambda x: x[1])
                         target_put = best_put[1]
-                        put_subtext = f"Snapped to {best_put[0]} at ${target_put:.2f}."
+                        put_subtext = f"Snapped to {best_put[0]} at ${target_put:.2f}. Tucked safely behind structure, just below the Math Floor (${math_floor:.2f})."
                     else:
                         target_put = math_floor
-                        put_subtext = f"Using Auto-Math Floor."
+                        put_subtext = f"Using Auto-Math Floor. Structural supports are too far away to justify sacrificing your premium."
 
                     st.write("---")
-                    st.markdown(f"### **{calc_tk} Current Price: ${px:.2f}**")
+                    st.markdown(f"### **{calc_tk} X-Ray Analysis | Current Price: ${px:.2f}**")
                     
                     col_m, col_s1, col_s2, col_s3 = st.columns(4)
                     with col_m:
@@ -465,239 +470,186 @@ with tab_safezone:
                             <div class="sniper-title">1. Auto-Math Move</div>
                             <div class="sniper-value put-color">Floor: ${math_floor:.2f}</div>
                             <div class="sniper-value call-color">Ceiling: ${math_ceil:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Base: {math_type_str}</div>
                             </div>""", unsafe_allow_html=True)
+                            
                     with col_s1:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">2. Price Action</div>
-                            <div style="color:#00C805;"><b>S1:</b> ${s1:.2f} | <b>S2:</b> ${s2:.2f}</div>
-                            <div style="color:#FF5000; margin-top:5px;"><b>R1:</b> ${r1:.2f} | <b>R2:</b> ${r2:.2f}</div>
+                            <div style="color:#00b09b;"><b>S1 ({lookback_days}d):</b> ${s1:.2f} <br><b>S2 ({macro_lookback}d):</b> ${s2:.2f}</div>
+                            <div style="color:#ff4b4b; margin-top:5px;"><b>R1 ({lookback_days}d):</b> ${r1:.2f} <br><b>R2 ({macro_lookback}d):</b> ${r2:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Dynamic Timeframe</div>
                             </div>""", unsafe_allow_html=True)
+                            
                     with col_s2:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">3. Volume Profile</div>
                             <div class="sniper-value neutral-color">POC: ${poc_price:.2f}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:10px;">{macro_lookback}-Day Volume Node</div>
                             </div>""", unsafe_allow_html=True)
+                            
                     with col_s3:
                         st.markdown(f"""<div class="sniper-box">
                             <div class="sniper-title">4. Options Walls</div>
-                            <div style="color:#00C805;"><b>Put Wall:</b> {put_wall_str}</div>
-                            <div style="color:#FF5000; margin-top:5px;"><b>Call Wall:</b> {call_wall_str}</div>
+                            <div style="color:#00b09b; font-size:1.2em;"><b>Put Wall:</b> {put_wall_str}</div>
+                            <div style="color:#ff4b4b; font-size:1.2em; margin-top:5px;"><b>Call Wall:</b> {call_wall_str}</div>
+                            <div style="font-size:0.8em; color:gray; margin-top:5px;">Max Open Interest</div>
                             </div>""", unsafe_allow_html=True)
                     
                     st.write("---")
                     st.markdown("#### 🎯 Target Strikes")
                     c_tgt1, c_tgt2 = st.columns(2)
-                    c_tgt1.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00C805;">🟢 TARGET PUT: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
-                    c_tgt2.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #FF5000;">🔴 TARGET CALL: ${math_ceil:.2f}</div><div class="target-sub">Auto-Ceiling</div></div>""", unsafe_allow_html=True)
+                    c_tgt1.markdown(f"""<div class="target-box-put"><div class="target-title" style="color: #00b09b;">🟢 TARGET PUT: ${target_put:.2f}</div><div class="target-sub">{put_subtext}</div></div>""", unsafe_allow_html=True)
+                    c_tgt2.markdown(f"""<div class="target-box-call"><div class="target-title" style="color: #ff4b4b;">🔴 TARGET CALL: ${math_ceil:.2f}</div><div class="target-sub">Auto-Ceiling</div></div>""", unsafe_allow_html=True)
 
                     if not puts_data.empty:
                         st.write("---")
                         st.markdown("#### 🛒 Live Premium Matrix (Puts)")
+                        st.caption("Check the 'Bid' and 'Ask' closely. If the spread is wide (e.g. Bid $0.10, Ask $1.00), do NOT trade it. Slippage will kill you.")
+                        
                         display_puts = puts_data[(puts_data['strike'] <= px) & (puts_data['strike'] > px * 0.6)].copy()
+                        
                         if not display_puts.empty:
                             display_puts['Distance %'] = ((px - display_puts['strike']) / px) * 100
                             display_puts['Mid'] = (display_puts['bid'] + display_puts['ask']) / 2
                             display_puts = display_puts.sort_values(by='strike', ascending=False)
+                            
                             matrix_df = display_puts[['strike', 'Distance %', 'bid', 'ask', 'Mid', 'openInterest']]
                             matrix_df.columns = ['Strike', 'Distance (%)', 'Bid', 'Ask', 'Mid Premium', 'Open Interest']
-                            st.dataframe(matrix_df.style.format({'Strike': '${:.2f}', 'Distance (%)': '{:.1f}%', 'Bid': '${:.2f}', 'Ask': '${:.2f}', 'Mid Premium': '${:.2f}', 'Open Interest': '{:,.0f}'}), use_container_width=True, hide_index=True)
-            except Exception as e: st.error(f"Calculation Error: {e}")
+                            
+                            st.dataframe(matrix_df.style.format({
+                                'Strike': '${:.2f}', 
+                                'Distance (%)': '{:.1f}%', 
+                                'Bid': '${:.2f}', 
+                                'Ask': '${:.2f}', 
+                                'Mid Premium': '${:.2f}',
+                                'Open Interest': '{:,.0f}'
+                            }).highlight_max(subset=['Open Interest'], color='rgba(0,176,155,0.2)'), use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("No relevant strikes found below current price.")
+                    else:
+                        st.warning("Could not fetch Live Premium Matrix. Exchange data may be unavailable.")
 
-# --- TAB 3: TRADE DESK ---
+            except Exception as e:
+                st.error(f"Calculation Error: {e}")
+
+# --- TAB 3: TRADE BOOK ---
 with tab_ledger:
+    
     df_j = st.session_state.journal
     
-    # ----------------------------------------------------
-    # DATA PARSING ENGINE (Open/Credit Basis Window Slicing)
-    # ----------------------------------------------------
-    today = datetime.now().date()
-    current_year = today.year
-    current_month_num = today.month
-    current_month_name = today.strftime("%B")
-    current_week_num = datetime.now().isocalendar()[1]
-    
-    if not df_j.empty:
-        df_j['parsed_open_date'] = pd.to_datetime(df_j['Date'], errors='coerce').dt.date
-        df_j['parsed_expiry_date'] = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
-        
-        # This Week Window
-        start_of_week = today - timedelta(days=today.weekday())
-        end_of_week = start_of_week + timedelta(days=6)
-        this_week_df = df_j[(df_j['parsed_open_date'] >= start_of_week) & (df_j['parsed_open_date'] <= end_of_week)]
-        weekly_profit = this_week_df["Premium"].sum()
-        
-        # Month to Date Window
-        mtd_df = df_j[(pd.to_datetime(df_j['Date']).dt.year == current_year) & (pd.to_datetime(df_j['Date']).dt.month == current_month_num)]
-        mtd_profit = mtd_df["Premium"].sum()
-        
-        # Year to Date Window
-        ytd_df = df_j[pd.to_datetime(df_j['Date']).dt.year == current_year]
-        ytd_profit = ytd_df["Premium"].sum()
-        
-        # Structural Metrics Engine (DTE and Averages) - Fixed Object Type Casting
-        open_datetimes = pd.to_datetime(this_week_df['Date'], errors='coerce')
-        expiry_datetimes = pd.to_datetime(this_week_df['Expiry'], errors='coerce')
-        valid_time_mask = open_datetimes.notna() & expiry_datetimes.notna()
-        
-        if valid_time_mask.any():
-            avg_dte = int((expiry_datetimes[valid_time_mask] - open_datetimes[valid_time_mask]).dt.days.mean())
-        else:
-            avg_dte = 7 # Default engine weeklies tracking fallback
-            
-        unique_weeks = df_j['Date'].apply(lambda x: pd.to_datetime(x).isocalendar()[1]).nunique()
-        avg_weekly_premium = ytd_profit / max(unique_weeks, 1)
-        
-        # Year-End Projection Math Model
-        days_elapsed = max((datetime.now().date() - datetime(current_year, 1, 1).date()).days, 1)
-        ye_projection = (ytd_profit / days_elapsed) * 365
-    else:
-        weekly_profit, mtd_profit, ytd_profit, avg_dte, avg_weekly_premium, ye_projection = 0.0, 0.0, 0.0, 7, 0.0, 0.0
-        this_week_df = pd.DataFrame()
-
-    def fmt_money(val):
-        color = "data-value positive" if val >= 0 else "data-value negative"
-        text = f"${abs(val):,.0f}"
-        return color, text
-
-    wk_col, wk_str = fmt_money(weekly_profit)
-    mo_col, mo_str = fmt_money(mtd_profit)
-    ytd_col, ytd_str = fmt_money(ytd_profit)
-    proj_col, proj_str = fmt_money(ye_projection)
-
-    # ----------------------------------------------------
-    # THE 4-BOX STREAMLIT DASHBOARD TERMINAL LAYOUT
-    # ----------------------------------------------------
-    row1_col1, row1_col2 = st.columns(2)
-    
-    # BOX 1: THE PREMIUMS DASHBOARD CARD
-    with row1_col1:
-        st.markdown(f"""
-        <div class="terminal-card">
-            <div class="card-title">🤑 Premiums</div>
-            <div class="main-metric">{wk_str}</div>
-            <div class="sub-metric-row">
-                <span>Avg DTE: {avg_dte}d</span>
-                <span>Avg Weekly Premium: ${avg_weekly_premium:,.0f}</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">{current_month_name} P&L</span>
-                <span class="{mo_col}">{mo_str}</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">{current_year} YTD</span>
-                <span class="{ytd_col}">{ytd_str}</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">Year-End Projection</span>
-                <span class="{proj_col}">{proj_str}</span>
-            </div>
+    st.markdown("""
+    <div class="creed-box">
+        <div class="creed-title">🧠 The Quants Creed</div>
+        <div class="creed-text">
+            <b>3 Emergency Protocols - when the market goes against you:</b><br>
+            <b>Cut:</b> Take the 200% - 300% mechanical loss. No hesitation.<br>
+            <b>Roll:</b> Roll out in time, but only for a net credit.<br>
+            <b>Hold:</b> Best is to wait it out and accept you could lose the entire (spread - premium).<br><br>
+            <b>The 45-DTE Golden Rules:</b><br>
+            🎯 Close trades when hitting 60% - 75% profit.<br>
+            ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE)
+            ⚠️ Do not hold into the final 20 days — Gamma risk will destroy your steady Theta gains.
         </div>
-        """, unsafe_allow_html=True)
-        
-    # BOX 2: THE QUANTS CREED RECORD PANEL
-    with row1_col2:
-        st.markdown("""
-        <div class="creed-box">
-            <div class="creed-title">🧠 The Quants Creed</div>
-            <div class="creed-text">
-                <b>3 Emergency Protocols - when the market goes against you:</b><br>
-                • <b>Cut:</b> Take the 200% - 300% mechanical loss. No hesitation.<br>
-                • <b>Roll:</b> Roll out in time, but only for a net credit.<br>
-                • <b>Hold:</b> Best is to wait it out and accept you could lose the entire collateral amount.<br><br>
-                <b>The 45-DTE Golden Rules:</b><br>
-                🎯 Close trades when hitting 60% - 75% profit.<br>
-                ⏱️ Optimal holding period is 20 to 30 days (Target: 24 DTE)<br>
-                ⚠️ Do not hold into the final 20 days — Gamma risk will destroy your steady Theta gains.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    row2_col1, row2_col2 = st.columns(2)
+    </div>
+    """, unsafe_allow_html=True)
     
-    # BOX 3: TICKER PERFORMANCE GRID
-    with row2_col1:
-        st.markdown('<div class="card-title" style="margin-bottom: 5px;">Active Weekly Allocations</div>', unsafe_allow_html=True)
-        if not this_week_df.empty:
-            grid_records = []
-            for ticker, group in this_week_df.groupby("Ticker"):
-                cc_val = group[group["Type"].astype(str).str.contains("Call", na=False)]["Premium"].sum()
-                put_val = group[group["Type"].astype(str).str.contains("Put", na=False)]["Premium"].sum()
-                total_val = cc_val + put_val
-                grid_records.append({"Ticker": ticker, "Covered Call": cc_val, "PUT": put_val, "Total Premium": total_val})
+    realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)]
+    total_realized = realized_df["Premium"].sum() if not realized_df.empty else 0.0
+    
+    total_closed = len(realized_df)
+    wins = len(realized_df[realized_df["Status"].astype(str).str.contains("Win", na=False)])
+    win_rate = (wins / total_closed * 100) if total_closed > 0 else 0.0
+    
+    active_df = df_j[df_j["Status"].astype(str).str.contains("Open", na=False)]
+    active_count = len(active_df)
+    
+    capital_at_risk = 0.0
+    for _, row in active_df.iterrows():
+        try:
+            strike = float(row["Strike"])
+            long_strike = float(row.get("Long Strike", 0.0))
+            qty = int(row["Qty"])
             
-            grid_df = pd.DataFrame(grid_records)
-            total_row = pd.DataFrame([{"Ticker": "TOTAL", "Covered Call": grid_df["Covered Call"].sum(), "PUT": grid_df["PUT"].sum(), "Total Premium": grid_df["Total Premium"].sum()}])
-            grid_df = pd.concat([grid_df, total_row], ignore_index=True)
-            
-            st.dataframe(grid_df.style.format({
-                'Covered Call': '${:,.2f}',
-                'PUT': '${:,.2f}',
-                'Total Premium': '${:,.2f}'
-            }).background_gradient(subset=['Total Premium'], cmap='Greens', low=0.0, high=0.3), use_container_width=True, hide_index=True)
-        else:
-            st.info("No options logged or active in the current weekly window cycle.")
-
-    # BOX 4: MARKET BENCHMARK RANKINGS & TOP PERFORMERS DUAL CORE PANEL
-    with row2_col2:
-        sub_left, sub_right = st.columns(2)
-        
-        with sub_left:
-            st.markdown('<div class="card-title" style="margin-bottom: 5px;">📊 Market Rankings YTD</div>', unsafe_allow_html=True)
-            live_benchmarks = get_market_rankings_ytd()
-            
-            account_return_pct = (ytd_profit / 250000.0) * 100 if ytd_profit != 0 else 0.0
-            
-            for index_name, return_val in live_benchmarks.items():
-                st.markdown(f"""
-                <div class="data-row">
-                    <span class="data-label">{index_name}</span>
-                    <span class="data-value positive">+{return_val:.2f}%</span>
-                </div>
-                """, unsafe_allow_html=True)
-            st.markdown(f"""
-            <div class="data-row" style="background: rgba(0, 200, 5, 0.06); border-radius: 4px; padding: 4px 6px;">
-                <span class="data-label" style="color: #00C805; font-weight: bold;">Lucky Money Lab</span>
-                <span class="data-value positive">+{account_return_pct:.2f}%</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with sub_right:
-            st.markdown('<div class="card-title" style="margin-bottom: 5px;">🏆 Top 5 Performers</div>', unsafe_allow_html=True)
-            if not df_j.empty:
-                top_perf = df_j.groupby("Ticker")["Premium"].sum().sort_values(ascending=False).head(5).reset_index()
-                for _, row in top_perf.iterrows():
-                    st.markdown(f"""
-                    <div class="data-row">
-                        <span class="data-label">{row['Ticker']}</span>
-                        <span class="data-value positive">${row['Premium']:,.2f}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
+            if long_strike > 0:
+                capital_at_risk += abs(strike - long_strike) * 100 * qty
             else:
-                st.caption("Awaiting performance ledger history computation updates.")
-
-    st.write("---")
+                capital_at_risk += strike * 100 * qty
+        except: pass
+        
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday()) 
+    end_of_week = start_of_week + timedelta(days=6) 
+    temp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce').dt.date
+    this_week_df = df_j[(temp_dates >= start_of_week) & (temp_dates <= end_of_week)]
+    weekly_profit = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    # ----------------------------------------------------
-    # SINGLE-LEG OPTION LOGGING INTERFACE FORM
-    # ----------------------------------------------------
-    with st.expander("➕ Log New Trade Entry", expanded=True):
+    if not this_week_df.empty and this_week_df["Premium"].max() > 0:
+        top_win_idx = this_week_df["Premium"].idxmax()
+        top_winner_str = f"{this_week_df.loc[top_win_idx, 'Ticker']} (+${this_week_df.loc[top_win_idx, 'Premium']:.0f})"
+    else:
+        top_winner_str = "N/A"
+        
+    if not this_week_df.empty and this_week_df["Premium"].min() < 0:
+        top_loss_idx = this_week_df["Premium"].idxmin()
+        top_loser_str = f"Loser: {this_week_df.loc[top_loss_idx, 'Ticker']} (${this_week_df.loc[top_loss_idx, 'Premium']:.0f})"
+    else:
+        top_loser_str = "Loser: N/A"
+    
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total Realized 🤑", f"${total_realized:,.2f}", f"Win Rate: {win_rate:.1f}%", delta_color="off")
+    k2.metric("Active Trades 📈", str(active_count), f"Risk: ${capital_at_risk:,.0f}", delta_color="off")
+    k3.metric("This Week P&L 📅", f"${weekly_profit:,.2f}", "Mon - Sun", delta_color="off")
+    k4.metric("Top Winner 🏆", top_winner_str, top_loser_str, delta_color="off")
+
+    # --- FIXED ACTIVE WEEKLY ALLOCATIONS GRID (Bypasses Matplotlib ImportError) ---
+    st.write("#### Active Weekly Allocations")
+    if not this_week_df.empty:
+        grid_records = []
+        for ticker, group in this_week_df.groupby("Ticker"):
+            cc_val = group[group["Type"].astype(str).str.contains("Call", na=False)]["Premium"].sum()
+            put_val = group[group["Type"].astype(str).str.contains("Put", na=False)]["Premium"].sum()
+            total_val = cc_val + put_val
+            grid_records.append({"Ticker": ticker, "Covered Call": cc_val, "PUT": put_val, "Total Premium": total_val})
+        
+        grid_df = pd.DataFrame(grid_records)
+        total_row = pd.DataFrame([{"Ticker": "TOTAL", "Covered Call": grid_df["Covered Call"].sum(), "PUT": grid_df["PUT"].sum(), "Total Premium": grid_df["Total Premium"].sum()}])
+        grid_df = pd.concat([grid_df, total_row], ignore_index=True)
+        
+        # Uses built-in .highlight_max to avoid calling the matplotlib dependency engine
+        st.dataframe(grid_df.style.format({
+            'Covered Call': '${:,.2f}',
+            'PUT': '${:,.2f}',
+            'Total Premium': '${:,.2f}'
+        }).highlight_max(subset=['Total Premium'], color='rgba(0,176,155,0.2)'), use_container_width=True, hide_index=True)
+    else:
+        st.info("No active trades found for the current weekly expiration cycle.")
+    
+    with st.expander("➕ Log New Trade", expanded=True):
         with st.form("new_trade_form", clear_on_submit=True):
-            l1, l2, l3 = st.columns(3)
+            l1, l2, l3, l4 = st.columns(4)
             _raw_tk = l1.text_input("Ticker", placeholder="e.g. AAPL")
-            n_ex = l2.date_input("Expiry Date", default_weekly_expiry)
-            n_qt = l3.number_input("Quantity", value=1, min_value=1)
+            n_ex = l2.date_input("Expiry", default_weekly_expiry)
             
-            l4, l5, l6 = st.columns(3)
-            n_ty = l4.selectbox("Strategy", ["Short Put", "Covered Call"])
-            n_st = l5.number_input("Strike price", value=None, format="%.1f", placeholder="e.g. 150.0")
-            n_op = l6.number_input("Premium", value=None, format="%.2f", placeholder="e.g. 1.45")
+            n_ty = l3.selectbox("Type", [
+                "Short Put", 
+                "Put Credit Spread", 
+                "Covered Call", 
+                "Call Credit Spread"
+            ])
+            n_qt = l4.number_input("Qty", value=1, min_value=1)
+            
+            l5, l6, l7 = st.columns(3)
+            n_st = l5.number_input("Strike (Sell)", value=None, format="%.1f", placeholder="e.g. 150.5")
+            n_ls = l6.number_input("Long Strike (Buy)", value=None, format="%.1f", placeholder="(Optional for Spreads)")
+            n_op = l7.number_input("Net Premium", value=None, format="%.2f", placeholder="e.g. 0.85")
             
             submitted = st.form_submit_button("🚀 Commit Trade", use_container_width=True, type="primary")
             
             if submitted:
                 n_tk = _raw_tk.upper() if _raw_tk else None
                 if n_tk and n_st is not None and n_op is not None:
-                    comm_rate = 1.05
+                    comm_rate = 2.10 if (n_ls is not None and n_ls > 0) else 1.05
                     comm = round(n_qt * comm_rate, 2)
                     net = round((float(n_op) * 100 * n_qt) - comm, 2)
                     
@@ -706,7 +658,7 @@ with tab_ledger:
                     
                     new_row = pd.DataFrame([{
                         "Date": str(datetime.now().date()), "Ticker": n_tk, "Type": n_ty, 
-                        "Strike": round(n_st, 1), "Long Strike": 0.0,
+                        "Strike": round(n_st, 1), "Long Strike": round(float(n_ls if n_ls else 0.0), 1),
                         "Expiry": str(n_ex), "Open Price": round(float(n_op), 2), 
                         "Close Price": 0.0, "Qty": n_qt, "Commission": comm, "Premium": net, "Status": stat
                     }])
@@ -714,9 +666,9 @@ with tab_ledger:
                     save_journal(st.session_state.journal)
                     st.rerun()
 
-    st.write("### Trade Ledger")
+    st.write("### Trade History")
     
-    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank', 'parsed_open_date', 'parsed_expiry_date'], errors='ignore')
+    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
     
     edt = st.data_editor(
         display_df, 
@@ -740,4 +692,4 @@ with tab_ledger:
         save_journal(updated_df)
         st.rerun()
 
-st.markdown(f'<div class="footer-right">Repository Master Live Handshake Sync: {st.session_state.last_update}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer-right">Last Synced to GitHub: {st.session_state.last_update}</div>', unsafe_allow_html=True)
