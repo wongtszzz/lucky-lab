@@ -335,7 +335,7 @@ with tab_safezone:
     with c_tog1:
         st.caption("Enter ticker and expiry to calculate structural support. Matrix will load below.")
     with c_tog2:
-        dynamic_risk = st.checkbox("🛡️ Enable RSI Risk Shield", value=False, help="When checked, modifies risk multiplier based on Oversold/Overbought conditions.")
+        dynamic_risk = st.checkbox("🛡️ Enable RSI Risk Shield", value=False, help="When checked, modifies risk multiplier based on Oversold/Overbought conditions. Leave unchecked to lock multiplier at 1.0 (Rigid/Riskier).")
     
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1: calc_tk = st.text_input("Ticker", value="TSLA", key="calc_tk2").upper()
@@ -519,7 +519,6 @@ with tab_safezone:
             except Exception as e:
                 st.error(f"Calculation Error: {e}")
 
-
 # --- TAB 3: PORTFOLIO DASHBOARD & TRADE BOOK ---
 with tab_ledger:
     df_j = st.session_state.journal.copy()
@@ -532,31 +531,14 @@ with tab_ledger:
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
     start_of_month = today.replace(day=1)
-    
     current_year = today.year
     start_of_year = today.replace(month=1, day=1)
     
-    # Advanced Realization Mapping
-    def calculate_realization_date(row):
-        try:
-            status_str = str(row['Status'])
-            opened_dt = pd.to_datetime(row['Date']).date()
-            expiry_dt = pd.to_datetime(row['Expiry']).date()
-            if "Expired" in status_str:
-                return expiry_dt
-            elif "Closed" in status_str:
-                if expiry_dt <= today:
-                    return expiry_dt
-                return opened_dt
-            return opened_dt
-        except:
-            return today
-
+    # Restored to use the simple trade 'Date' logic so your 'This Week' numbers are accurate to your ledger
     if not realized_df.empty:
-        realized_df['realized_date'] = realized_df.apply(calculate_realization_date, axis=1)
-        weekly_p = realized_df[realized_df['realized_date'] >= start_of_week]["Premium"].sum()
-        monthly_p = realized_df[realized_df['realized_date'] >= start_of_month]["Premium"].sum()
-        ytd_p = realized_df[realized_df['realized_date'] >= start_of_year]["Premium"].sum()
+        weekly_p = realized_df[realized_df['temp_date'].dt.date >= start_of_week]["Premium"].sum()
+        monthly_p = realized_df[realized_df['temp_date'].dt.date >= start_of_month]["Premium"].sum()
+        ytd_p = realized_df[realized_df['temp_date'].dt.date >= start_of_year]["Premium"].sum()
     else:
         weekly_p, monthly_p, ytd_p = 0.0, 0.0, 0.0
     
@@ -575,11 +557,10 @@ with tab_ledger:
     trading_days_passed = max(1, day_of_year * (252/365))
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
-    # Dynamic Formatting Helper (Restores minus sign for losses)
+    # PERFECTED FORMATTING: Strictly forces absolute values. Zero minus signs will ever render.
     def fmt_money(val):
         color = "dash-metric-green" if val >= 0 else "dash-metric-red"
-        sign = "-" if val < 0 else ""
-        text = f"{sign}${abs(val):,.0f}"
+        text = f"${abs(val):,.0f}"
         return color, text
 
     wk_col, wk_str = fmt_money(weekly_p)
@@ -602,7 +583,7 @@ with tab_ledger:
             </div>
             <div class="dash-metric-row" style="margin-bottom: 15px;">
                 <span class="dash-metric-label" style="font-size: 0.82em; font-style: italic; color: #8B949E;">Avg DTE: {avg_dte:.1f} days</span>
-                <span style="font-size: 0.82em; color: #8B949E; text-align: right;">Avg Weekly: <span class="{avg_wk_col}">{avg_wk_str}</span></span>
+                <span style="font-size: 0.82em; text-align: right;"><span style="color: #8B949E;">Avg Weekly:</span> <span class="{avg_wk_col}">{avg_wk_str}</span></span>
             </div>
             
             <div class="dash-metric-row">
