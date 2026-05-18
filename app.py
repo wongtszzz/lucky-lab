@@ -575,10 +575,11 @@ with tab_ledger:
     trading_days_passed = max(1, day_of_year * (252/365))
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
-    # Dynamic Formatting Helper (FIXED: Strips minus sign entirely, uses color to denote win/loss)
+    # Dynamic Formatting Helper (Restores minus sign for losses)
     def fmt_money(val):
         color = "dash-metric-green" if val >= 0 else "dash-metric-red"
-        text = f"${abs(val):,.0f}"
+        sign = "-" if val < 0 else ""
+        text = f"{sign}${abs(val):,.0f}"
         return color, text
 
     wk_col, wk_str = fmt_money(weekly_p)
@@ -601,11 +602,11 @@ with tab_ledger:
             </div>
             <div class="dash-metric-row" style="margin-bottom: 15px;">
                 <span class="dash-metric-label" style="font-size: 0.82em; font-style: italic; color: #8B949E;">Avg DTE: {avg_dte:.1f} days</span>
-                <span class="{avg_wk_col}" style="font-size: 0.82em; text-align: right;">Avg Weekly: {avg_wk_str}</span>
+                <span style="font-size: 0.82em; color: #8B949E; text-align: right;">Avg Weekly: <span class="{avg_wk_col}">{avg_wk_str}</span></span>
             </div>
             
             <div class="dash-metric-row">
-                <span class="dash-metric-label">{today.strftime('%B')} (MTD)</span>
+                <span class="dash-metric-label">{today.strftime('%B')} P&L</span>
                 <span class="{mo_col}">{mo_str}</span>
             </div>
             
