@@ -541,19 +541,39 @@ with tab_ledger:
     
     # --- DATA PROCESSING ---
     
-    # 1. This Week P&L (Based strictly on Expiry Date to capture what is closing this week)
-    temp_exp_dates = pd.to_datetime(df_j['Expiry'], errors='coerce')
-    start_of_week_dt = pd.to_datetime(start_of_week)
-    end_of_week_dt = pd.to_datetime(end_of_week)
-    this_week_df = df_j[(temp_exp_dates >= start_of_week_dt) & (temp_exp_dates <= end_of_week_dt)]
+    # 1. THIS WEEK P&L: Restored to original flawless logic (filters ALL trades by Expiry Date)
+    def get_safe_date(x):
+        try:
+            return pd.to_datetime(x).date()
+        except:
+            return datetime.min.date()
+            
+    df_j['safe_exp'] = df_j['Expiry'].apply(get_safe_date)
+    this_week_df = df_j[(df_j['safe_exp'] >= start_of_week) & (df_j['safe_exp'] <= end_of_week)]
     weekly_p = this_week_df["Premium"].sum() if not this_week_df.empty else 0.0
     
-    # 2. Month & YTD P&L (Based strictly on Open Date for realized trades to preserve accurate historical metrics)
+    # 2. MONTH & YTD P&L: Restored to use Realization logic (Only counts closed trades)
     realized_df = df_j[~df_j["Status"].astype(str).str.contains("Open", na=False)].copy()
+    
+    def calculate_realization_date(row):
+        try:
+            status_str = str(row['Status'])
+            opened_dt = pd.to_datetime(row['Date']).date()
+            expiry_dt = pd.to_datetime(row['Expiry']).date()
+            if "Expired" in status_str:
+                return expiry_dt
+            elif "Closed" in status_str:
+                if expiry_dt <= today:
+                    return expiry_dt
+                return opened_dt
+            return opened_dt
+        except:
+            return today
+
     if not realized_df.empty:
-        realized_df['temp_open_dt'] = pd.to_datetime(realized_df['Date'], errors='coerce').dt.date
-        monthly_p = realized_df[realized_df['temp_open_dt'] >= start_of_month]["Premium"].sum()
-        ytd_p = realized_df[realized_df['temp_open_dt'] >= start_of_year]["Premium"].sum()
+        realized_df['realized_date'] = realized_df.apply(calculate_realization_date, axis=1)
+        monthly_p = realized_df[realized_df['realized_date'] >= start_of_month]["Premium"].sum()
+        ytd_p = realized_df[realized_df['realized_date'] >= start_of_year]["Premium"].sum()
     else:
         monthly_p, ytd_p = 0.0, 0.0
     
@@ -572,7 +592,7 @@ with tab_ledger:
     trading_days_passed = max(1, day_of_year * (252/365))
     projected_p = (ytd_p / trading_days_passed) * 252 if trading_days_passed > 0 else 0.0
 
-    # PERFECTED FORMATTING: Strictly forces absolute values. Zero minus signs will ever render.
+    # THE BULLETPROOF FORMATTER: Absolute values only. Zero minus signs will ever display.
     def fmt_money(val):
         color = "dash-metric-green" if val >= 0 else "dash-metric-red"
         text = f"${abs(val):,.0f}"
@@ -685,10 +705,10 @@ with tab_ledger:
     with r2c2:
         st.markdown('<div class="dash-card"><div class="dash-title">Cumulative P&L (YTD)</div>', unsafe_allow_html=True)
         if not realized_df.empty:
-            chart_data = realized_df[realized_df['temp_open_dt'] >= start_of_year].sort_values('temp_open_dt').copy()
+            chart_data = realized_df[realized_df['realized_date'] >= start_of_year].sort_values('realized_date').copy()
             if not chart_data.empty:
                 chart_data['Cumulative'] = chart_data['Premium'].cumsum()
-                st.area_chart(chart_data.set_index('temp_open_dt')['Cumulative'], color="#FF4B4B")
+                st.area_chart(chart_data.set_index('realized_date')['Cumulative'], color="#FF4B4B")
             else:
                 st.caption("No trades closed this year yet.")
         else:
@@ -734,7 +754,7 @@ with tab_ledger:
 
     with r3c2:
         st.markdown('<div class="dash-card"><div class="dash-title">Top & Worst Performers (MTD)</div>', unsafe_allow_html=True)
-        mtd_df = realized_df[realized_df['temp_open_dt'] >= start_of_month]
+        mtd_df = realized_df[realized_df['realized_date'] >= start_of_month]
         if not mtd_df.empty:
             mtd_grouped = mtd_df.groupby("Ticker")["Premium"].sum().reset_index()
             mtd_grouped = mtd_grouped.sort_values("Premium", ascending=False)
@@ -798,7 +818,7 @@ with tab_ledger:
     # --- TRADE HISTORY ---
     st.write("### 📓 Raw Trade Ledger")
     
-    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank', 'temp_open_dt'], errors='ignore')
+    display_df = st.session_state.journal.drop(columns=['temp_exp', 'temp_date', 'status_rank'], errors='ignore')
     
     edt = st.data_editor(
         display_df, 
