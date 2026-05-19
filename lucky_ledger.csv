@@ -33,7 +33,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-05-04,AVGO,Short Put,385.0,2026-05-06,0.4,0.0,1,1.05,38.95,Expired (Win)
 2026-05-04,META,Short Put,572.5,2026-05-06,0.22,0.0,1,1.05,20.95,Expired (Win)
 2026-05-04,ASML,Short Put,1255.0,2026-05-08,1.9,0.45,1,1.1,143.9,Closed (Win)
-2026-05-04,JPM,Short Put,285.0,2026-06-18,2.9,3.2,1,1.06,-31.06,Closed (Loss)
+2026-05-04,JPM,Short Put,285.0,2026-06-18,2.9,3.2,1,2.1,-32.1,Closed (Loss)
 2026-05-04,GLD,Covered Call,428.0,2026-05-06,0.48,4.4,1,1.85,-393.85,Closed (Loss)
 2026-05-01,GLD,Covered Call,431.0,2026-05-04,0.65,0.0,1,0.8,64.2,Expired (Win)
 2026-05-01,META,Short Put,577.5,2026-05-04,0.13,0.0,1,1.05,11.95,Expired (Win)
