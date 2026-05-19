@@ -11,26 +11,22 @@ from alpaca.data.requests import OptionChainRequest, StockLatestQuoteRequest, St
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import OptionsFeed, DataFeed
 from github import Github
-import google.generativeai as genai
 
 # --- 1. CONFIG & API ---
 st.set_page_config(page_title="Lucky Money Lab", page_icon="🧪", layout="wide")
 
-# Institutional Fintech Dark Theme
+# Institutional Fintech Dark Theme (Transparent & Flat)
 st.markdown("""
 <style>
-    /* Global Background Override */
-    .stApp { background-color: #0A0B0D; color: #D1D4DC; font-family: 'Inter', -apple-system, sans-serif; }
+    /* Global Font Override */
+    .stApp { font-family: 'Inter', -apple-system, sans-serif; }
     
-    /* Premium Dashboard Cards */
+    /* Premium Dashboard Cards - Now Invisible/Transparent */
     .terminal-card {
-        background-color: #12141A;
+        background-color: transparent;
         border: none;
-        border-radius: 8px;
-        padding: 24px;
+        padding: 10px 0;
         margin-bottom: 20px;
-        height: 100%;
-        min-height: 340px;
     }
     .card-title {
         font-size: 0.85rem;
@@ -38,14 +34,13 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 1px;
         font-weight: 600;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
         border-bottom: 1px solid #1E2128;
         padding-bottom: 10px;
     }
     .main-metric {
         font-size: 2.5rem;
         font-weight: 700;
-        color: #FFFFFF;
         margin-bottom: 4px;
         letter-spacing: -0.5px;
     }
@@ -65,40 +60,34 @@ st.markdown("""
     }
     .data-row:last-child { border-bottom: none; }
     .data-label { color: #8C92A4; font-weight: 500; }
-    .data-value { font-weight: 600; color: #FFFFFF; }
+    .data-value { font-weight: 600; }
     .data-value.positive { color: #00C805; } 
     .data-value.negative { color: #FF5000; } 
     .data-value.neutral { color: #F5B041; }
     
-    /* Creed Box Customization */
+    /* Creed Box Customization - Now Invisible/Transparent */
     .creed-box { 
-        background-color: #12141A; 
+        background-color: transparent; 
         border: none; 
-        border-radius: 8px; 
-        padding: 24px; 
-        height: 100%;
-        min-height: 340px;
+        padding: 10px 0; 
     }
     .creed-title { font-weight: 700; font-size: 1rem; margin-bottom: 15px; color: #2962FF; letter-spacing: 1px; text-transform: uppercase; }
     .creed-text { font-size: 0.9rem; line-height: 1.7; color: #B0B5C1; }
     
     /* Sniper Styles */
-    .sniper-box { background-color: #12141A; border: none; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+    .sniper-box { background-color: rgba(255,255,255,0.03); border: none; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
     .sniper-title { font-size: 0.85em; color: #8C92A4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
     .sniper-value { font-size: 1.8em; font-weight: 700; }
     .put-color { color: #00C805; }
     .call-color { color: #FF5000; }
     .neutral-color { color: #F5B041; }
     
-    .synthesis-box { background-color: rgba(28, 131, 225, 0.08); border-left: 4px solid #1c83e1; padding: 20px; border-radius: 5px; margin-bottom: 20px;}
-    .synthesis-box h3 { margin-top: 0; font-size: 1.2em; color: #2962FF; }
-    
     .target-box-put { background-color: rgba(0, 200, 5, 0.05); border-left: 4px solid #00C805; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
     .target-box-call { background-color: rgba(255, 80, 0, 0.05); border-left: 4px solid #FF5000; padding: 20px; border-radius: 5px; margin-bottom: 15px; }
     .target-title { font-size: 2.2em; font-weight: 800; margin: 0; }
     .target-sub { margin: 5px 0 0 0; color: #8C92A4; font-size: 1.0em; }
     
-    .auto-risk-banner { background-color: #12141A; padding: 10px 15px; border-radius: 5px; border: 1px dashed #1E2128; margin-top: 10px; margin-bottom: 10px; text-align: center; color: #8C92A4;}
+    .auto-risk-banner { background-color: rgba(255,255,255,0.02); padding: 10px 15px; border-radius: 5px; border: 1px dashed #1E2128; margin-top: 10px; margin-bottom: 10px; text-align: center; color: #8C92A4;}
     .footer-right { position: fixed; bottom: 10px; right: 10px; color: #555; font-size: 0.75em; z-index: 1000; }
 
     /* Stripe the 'Press Enter to submit form' micro-copy completely */
@@ -107,7 +96,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### Lucky Money Lab 🧪")
+st.markdown("### Lucky Lab 🧪")
 st.divider()
 
 # API Connections
@@ -192,7 +181,6 @@ def load_journal():
         decoded_content = base64.b64decode(contents.content).decode('utf-8')
         raw_df = pd.read_csv(io.StringIO(decoded_content))
         
-        # Cleanup routine to ditch the old Long Strike column if it exists in the raw CSV
         if 'Long Strike' in raw_df.columns:
             raw_df = raw_df.drop(columns=['Long Strike'])
         
@@ -337,51 +325,6 @@ with tab_macro:
         b1, b2 = st.columns(2)
         b1.metric("S&P 500 Breadth", f"{s5tw_pct:.0f}%", f"{s5tw_up}/{s5tw_total} Sectors Trending Up", delta_color="normal" if s5tw_pct >= 50 else "inverse")
         b2.metric("Nasdaq Breadth", f"{nctw_pct:.0f}%", f"{nctw_up}/{nctw_total} Mega-Caps Trending Up", delta_color="normal" if nctw_pct >= 50 else "inverse")
-
-        st.write("---")
-        
-        st.markdown("#### 🧠 AI Chief Economist Brief")
-        
-        @st.cache_data(ttl=3600) 
-        def get_ai_macro_brief(vix, dxy, oil, breadth_avg):
-            try:
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                target_model = next((m for m in valid_models if 'lite' in m), valid_models[0])
-                model = genai.GenerativeModel(target_model)
-                
-                prompt = f"""
-                You are the ruthless, professional Chief Market Strategist for an options volatility trading desk. 
-                Write a morning macro brief based strictly on these live numbers:
-                - VIX: {vix:.2f}
-                - DXY (US Dollar): {dxy:.2f}
-                - WTI Crude Oil: ${oil:.2f}
-                - Market Breadth: {breadth_avg:.0f}% of stocks trending up.
-                
-                Format your response in exactly 3 short, punchy sections using Markdown. Do not use filler words.
-                
-                ### 🌍 The Current Regime
-                ### 📰 The Forward Look
-                ### 🎯 Option Seller Action Plan
-                """
-                response = model.generate_content(prompt)
-                return response.text
-                
-            except Exception as e:
-                try:
-                    debug_models = [m.name for m in genai.list_models()]
-                    return f"⚠️ **AI Engine Offline.** <br><br><b>Error:</b> {e}<br><br><b>Google says these are your ONLY approved models:</b><br> {debug_models}"
-                except:
-                    return f"⚠️ **AI Engine Offline.** Error details: {e}"
-
-        with st.spinner("Chief Economist is analyzing the live data..."):
-            ai_brief = get_ai_macro_brief(vix_px, dxy_px, oil_px, s5tw_pct)
-            
-        st.markdown(f"""
-        <div class="synthesis-box">
-            {ai_brief}
-        </div>
-        """, unsafe_allow_html=True)
 
     except Exception as e: pass
 
@@ -669,30 +612,38 @@ with tab_ledger:
                 put_val = group[group["Type"].astype(str).str.contains("Put", na=False)]["Premium"].sum()
                 total_val = cc_val + put_val
                 
-                # Progress calculation (Time Decay over 5 days)
+                # Dynamic Progress calculation based on actual Open/Expiry dates
                 min_date = group['parsed_open_date'].min()
-                days_elapsed = (datetime.now().date() - min_date).days
-                progress_pct = min(max((days_elapsed / 5.0) * 100, 0.0), 100.0)
+                max_exp = group['parsed_expiry_date'].max()
                 
+                if pd.notna(min_date) and pd.notna(max_exp):
+                    total_days = (max_exp - min_date).days
+                    total_days = total_days if total_days > 0 else 1
+                    days_elapsed = (datetime.now().date() - min_date).days
+                    progress_pct = min(max((days_elapsed / total_days) * 100, 0.0), 100.0)
+                else:
+                    progress_pct = 0.0
+
                 grid_records.append({
                     "Ticker": ticker, 
-                    "Covered Call": cc_val if cc_val != 0 else None, 
-                    "PUT": put_val if put_val != 0 else None, 
-                    "Total Premium": total_val if total_val != 0 else None,
+                    "Covered Call": f"${cc_val:,.2f}" if cc_val != 0 else "", 
+                    "PUT": f"${put_val:,.2f}" if put_val != 0 else "", 
+                    "Total Premium": f"${total_val:,.2f}" if total_val != 0 else "",
                     "Time Decay": progress_pct
                 })
             
             grid_df = pd.DataFrame(grid_records)
             
-            total_cc = grid_df["Covered Call"].sum()
-            total_put = grid_df["PUT"].sum()
-            total_prem = grid_df["Total Premium"].sum()
+            # String conversions for totals so 0s can be empty strings
+            total_cc = grid_df["Covered Call"].replace('', '$0').replace('[\$,]', '', regex=True).astype(float).sum()
+            total_put = grid_df["PUT"].replace('', '$0').replace('[\$,]', '', regex=True).astype(float).sum()
+            total_prem = grid_df["Total Premium"].replace('', '$0').replace('[\$,]', '', regex=True).astype(float).sum()
             
             total_row = pd.DataFrame([{
                 "Ticker": "TOTAL", 
-                "Covered Call": total_cc if total_cc != 0 else None, 
-                "PUT": total_put if total_put != 0 else None, 
-                "Total Premium": total_prem if total_prem != 0 else None,
+                "Covered Call": f"${total_cc:,.2f}" if total_cc != 0 else "", 
+                "PUT": f"${total_put:,.2f}" if total_put != 0 else "", 
+                "Total Premium": f"${total_prem:,.2f}" if total_prem != 0 else "",
                 "Time Decay": None
             }])
             grid_df = pd.concat([grid_df, total_row], ignore_index=True)
@@ -702,12 +653,12 @@ with tab_ledger:
                 use_container_width=True, 
                 hide_index=True,
                 column_config={
-                    "Covered Call": st.column_config.NumberColumn(format="$%.2f"),
-                    "PUT": st.column_config.NumberColumn(format="$%.2f"),
-                    "Total Premium": st.column_config.NumberColumn(format="$%.2f"),
+                    "Covered Call": st.column_config.TextColumn("Covered Call"),
+                    "PUT": st.column_config.TextColumn("PUT"),
+                    "Total Premium": st.column_config.TextColumn("Total Premium"),
                     "Time Decay": st.column_config.ProgressColumn(
                         "Time Decay",
-                        help="Time passed across a 5-day trading window",
+                        help="Time passed based on actual trade Open and Expiry dates",
                         format="%.0f%%",
                         min_value=0,
                         max_value=100
@@ -727,10 +678,8 @@ with tab_ledger:
             
             account_return_pct = (ytd_profit / 250000.0) * 100 if ytd_profit != 0 else 0.0
             
-            # Inject your portfolio as a standard row to participate in the sort
             live_benchmarks["Lucky Lab 🧪"] = account_return_pct
             
-            # Sort from Highest to Lowest
             sorted_rankings = sorted(live_benchmarks.items(), key=lambda item: item[1], reverse=True)
             
             for index_name, return_val in sorted_rankings:
