@@ -4,6 +4,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-05-26,NVDA,Short Put,205.0,2026-05-29,0.47,0.0,1,0.63,46.37,Open / Active
 2026-05-26,MSFT,Short Put,405.0,2026-05-29,0.85,0.0,1,1.05,83.95,Open / Active
 2026-05-26,ASML,Short Put,1460.0,2026-05-29,1.3,0.0,1,1.05,128.95,Open / Active
+2026-05-26,LITE,Short Put,750.0,2026-05-29,1.2,0.0,1,1.05,118.95,Open / Active
 2026-05-22,GLD,Covered Call,433.0,2026-05-27,0.16,0.0,1,1.05,14.95,Open / Active
 2026-05-22,AVGO,Short Put,387.5,2026-05-26,0.4,0.0,1,0.8,39.2,Open / Active
 2026-05-22,NVDA,Short Put,205.0,2026-05-26,0.17,0.0,1,1.05,15.95,Open / Active
