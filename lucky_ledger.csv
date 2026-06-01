@@ -1,6 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-06-01,META,Short Put,582.5,2026-06-03,0.5,0.0,1,0.77,49.23,Open / Active
-2026-06-01,LITE,Short Put,680.0,2026-06-05,3.0,0.0,1,1.05,298.95,Open / Active
+2026-06-01,LITE,Short Put,680.0,2026-06-05,3.0,0.0,1,0.06,299.94,Open / Active
 2026-05-29,GLD,Covered Call,433.0,2026-06-01,0.1,0.0,1,1.05,8.95,Open / Active
 2026-05-28,GLD,Covered Call,420.0,2026-05-29,0.15,0.0,1,0.8,14.2,Expired (Win)
 2026-05-26,NVDA,Short Put,205.0,2026-05-29,0.47,0.0,1,0.63,46.37,Expired (Win)
