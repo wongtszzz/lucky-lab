@@ -5,7 +5,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-06-01,META,Short Put,582.5,2026-06-03,0.5,0.0,1,0.77,49.23,Expired (Win)
 2026-06-01,TSLA,Short Put,392.5,2026-06-03,0.31,0.0,1,1.05,29.95,Expired (Win)
 2026-06-01,NVDA,Short Put,205.0,2026-06-03,0.22,0.0,1,1.05,20.95,Expired (Win)
-2026-06-01,MSFT,Short Put,430.0,2026-06-03,0.39,2.3,1,1.05,-192.05,Closed (Loss)
+2026-06-01,MSFT,Short Put,430.0,2026-06-03,0.39,2.3,1,2.1,-193.1,Closed (Loss)
 2026-05-29,GLD,Covered Call,433.0,2026-06-01,0.1,0.0,1,1.05,8.95,Expired (Win)
 2026-05-28,GLD,Covered Call,420.0,2026-05-29,0.15,0.0,1,0.8,14.2,Expired (Win)
 2026-05-26,NVDA,Short Put,205.0,2026-05-29,0.47,0.0,1,0.63,46.37,Expired (Win)
