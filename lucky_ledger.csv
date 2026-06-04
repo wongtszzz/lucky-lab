@@ -1,11 +1,11 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-06-03,TSLA,Short Put,392.5,2026-06-05,0.47,0.0,1,1.05,45.95,Open / Active
 2026-06-02,AMD,Short Put,445.0,2026-06-05,1.44,0.0,1,1.05,142.95,Open / Active
-2026-06-01,META,Short Put,582.5,2026-06-03,0.5,0.0,1,0.77,49.23,Open / Active
 2026-06-01,LITE,Short Put,680.0,2026-06-05,3.0,0.0,1,0.06,299.94,Open / Active
-2026-06-01,TSLA,Short Put,392.5,2026-06-03,0.31,0.0,1,1.05,29.95,Open / Active
-2026-06-01,MSFT,Short Put,430.0,2026-06-03,0.39,0.0,1,1.05,37.95,Open / Active
-2026-06-01,NVDA,Short Put,205.0,2026-06-03,0.22,0.0,1,1.05,20.95,Open / Active
+2026-06-01,META,Short Put,582.5,2026-06-03,0.5,0.0,1,0.77,49.23,Expired (Win)
+2026-06-01,TSLA,Short Put,392.5,2026-06-03,0.31,0.0,1,1.05,29.95,Expired (Win)
+2026-06-01,MSFT,Short Put,430.0,2026-06-03,0.39,0.0,1,1.05,37.95,Expired (Win)
+2026-06-01,NVDA,Short Put,205.0,2026-06-03,0.22,0.0,1,1.05,20.95,Expired (Win)
 2026-05-29,GLD,Covered Call,433.0,2026-06-01,0.1,0.0,1,1.05,8.95,Expired (Win)
 2026-05-28,GLD,Covered Call,420.0,2026-05-29,0.15,0.0,1,0.8,14.2,Expired (Win)
 2026-05-26,NVDA,Short Put,205.0,2026-05-29,0.47,0.0,1,0.63,46.37,Expired (Win)
