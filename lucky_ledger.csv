@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-06-08,META,Short Put,520.0,2026-06-10,0.25,0.0,1,1.05,23.95,Open / Active
 2026-06-05,NVDA,Short Put,202.5,2026-06-08,0.25,0.0,1,1.05,23.95,Open / Active
 2026-06-05,TSLA,Short Put,375.0,2026-06-08,0.2,0.0,1,0.77,19.23,Open / Active
 2026-06-05,MSFT,Short Put,407.5,2026-06-08,0.3,0.0,1,1.05,28.95,Open / Active
