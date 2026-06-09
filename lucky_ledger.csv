@@ -2,9 +2,9 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-06-08,META,Short Put,520.0,2026-06-10,0.25,0.0,1,1.05,23.95,Open / Active
 2026-06-08,JPM,Short Put,295.0,2026-06-12,0.42,0.0,1,1.05,40.95,Open / Active
 2026-06-08,CRWD,Short Put,587.5,2026-06-12,1.16,0.0,1,1.05,114.95,Open / Active
-2026-06-05,NVDA,Short Put,202.5,2026-06-08,0.25,0.0,1,1.05,23.95,Open / Active
-2026-06-05,TSLA,Short Put,375.0,2026-06-08,0.2,0.0,1,0.77,19.23,Open / Active
-2026-06-05,MSFT,Short Put,407.5,2026-06-08,0.3,0.0,1,1.05,28.95,Open / Active
+2026-06-05,NVDA,Short Put,202.5,2026-06-08,0.25,0.0,1,1.05,23.95,Expired (Win)
+2026-06-05,TSLA,Short Put,375.0,2026-06-08,0.2,0.0,1,0.77,19.23,Expired (Win)
+2026-06-05,MSFT,Short Put,407.5,2026-06-08,0.3,0.0,1,1.05,28.95,Expired (Win)
 2026-06-04,META,Short Put,595.0,2026-06-05,0.3,0.0,1,0.77,29.23,Expired (Win)
 2026-06-04,CRWD,Short Put,630.0,2026-06-05,0.6,0.0,1,0.8,59.2,Expired (Win)
 2026-06-03,TSLA,Short Put,392.5,2026-06-05,0.47,0.0,1,1.05,45.95,Expired (Win)
