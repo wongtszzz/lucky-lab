@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-06-09,LITE,Short Put,660.0,2026-06-12,0.95,0.0,1,1.05,93.95,Open / Active
 2026-06-08,META,Short Put,520.0,2026-06-10,0.25,0.0,1,1.05,23.95,Open / Active
 2026-06-08,JPM,Short Put,295.0,2026-06-12,0.42,0.0,1,1.05,40.95,Open / Active
 2026-06-08,CRWD,Short Put,587.5,2026-06-12,1.16,0.0,1,1.05,114.95,Open / Active
