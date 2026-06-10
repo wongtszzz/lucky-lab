@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-06-10,NVDA,Short Put,195.0,2026-06-12,0.5,0.0,1,1.05,48.95,Open / Active
+2026-06-10,GEV,Short Put,800.0,2026-06-12,1.3,0.0,1,1.05,128.95,Open / Active
 2026-06-09,LITE,Short Put,660.0,2026-06-12,0.95,0.0,1,0.05,94.95,Open / Active
 2026-06-08,META,Short Put,520.0,2026-06-10,0.25,0.0,1,1.05,23.95,Open / Active
 2026-06-08,JPM,Short Put,295.0,2026-06-12,0.42,0.0,1,1.05,40.95,Open / Active
