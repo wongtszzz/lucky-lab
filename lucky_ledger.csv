@@ -5,7 +5,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-06-15,ASML,Short Put,1680.0,2026-06-18,2.25,0.0,1,1.06,223.94,Open / Active
 2026-06-15,GLD,Covered Call,433.0,2026-06-18,0.1,0.0,1,1.05,8.95,Open / Active
 2026-06-15,AVGO,Short Put,350.0,2026-06-18,0.5,0.0,1,1.05,48.95,Open / Active
-2026-06-12,NASA,Short Put,31.0,2026-06-18,1.75,0.16,4,2.82,633.18,Closed (Win)
+2026-06-12,NASA,Short Put,31.0,2026-06-18,1.75,0.16,4,1.41,634.59,Closed (Win)
 2026-06-12,GLD,Covered Call,403.0,2026-06-15,0.16,0.0,1,1.05,14.95,Expired (Win)
 2026-06-12,TSLA,Short Put,355.0,2026-06-15,0.44,0.0,1,1.05,42.95,Expired (Win)
 2026-06-12,AVGO,Short Put,350.0,2026-06-15,0.37,0.0,1,1.05,35.95,Expired (Win)
