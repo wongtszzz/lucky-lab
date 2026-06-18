@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-06-18,TSLA,Short Put,362.5,2026-06-22,0.3,0.0,1,1.05,28.95,Open / Active
 2026-06-16,AMD,Short Put,480.0,2026-06-18,1.1,0.0,1,1.05,108.95,Open / Active
 2026-06-16,TSLA,Short Put,377.5,2026-06-18,0.51,0.0,1,1.05,49.95,Open / Active
 2026-06-15,MRVL,Short Put,255.0,2026-06-18,2.8,0.0,1,1.06,278.94,Open / Active
