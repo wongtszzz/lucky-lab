@@ -70,11 +70,11 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-05-11,MSFT,Short Put,390.0,2026-05-13,0.15,0.0,1,1.05,13.95,Expired (Win)
 2026-05-11,META,Short Put,565.0,2026-05-13,0.2,0.0,1,1.05,18.95,Expired (Win)
 2026-05-11,COST,Short Put,950.0,2026-05-15,1.33,0.21,1,2.1,109.9,Closed (Win)
-2026-05-08,VOO,Covered Call,650.0,2026-06-26,35.35,0.0,1,1.13,3533.87,Open / Active
 2026-05-08,GLD,Covered Call,440.0,2026-05-11,0.75,0.0,1,1.05,73.95,Expired (Win)
 2026-05-08,VRT,Short Put,310.0,2026-05-08,0.38,0.0,1,0.8,37.2,Expired (Win)
 2026-05-08,TSLA,Short Put,372.5,2026-05-08,0.15,0.0,2,1.4,28.6,Expired (Win)
 2026-05-08,LITE,Short Put,770.0,2026-05-08,1.3,0.0,1,1.05,128.95,Expired (Win)
+2026-05-08,VOO,Covered Call,650.0,2026-06-26,35.35,41.46,1,1.13,-612.13,Closed (Loss)
 2026-05-06,AVGO,Short Put,385.0,2026-05-08,0.43,0.0,1,1.05,41.95,Expired (Win)
 2026-05-06,CRWD,Short Put,425.0,2026-05-08,0.55,0.0,1,1.05,53.95,Expired (Win)
 2026-05-06,GLD,Covered Call,440.0,2026-05-08,1.0,0.02,1,1.85,96.15,Closed (Win)
