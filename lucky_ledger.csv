@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-06-25,TSM,Short Put,390.0,2026-06-26,0.4,0.0,1,1.05,38.95,Open / Active
+2026-06-25,AVGO,Short Put,357.5,2026-06-26,0.39,0.0,1,1.05,37.95,Open / Active
 2026-06-24,GLD,Covered Call,389.0,2026-06-26,0.15,0.0,1,1.05,13.95,Open / Active
 2026-06-24,NVDA,Short Put,190.0,2026-06-26,0.25,0.0,1,1.05,23.95,Open / Active
 2026-06-22,AMD,Short Put,475.0,2026-06-26,1.66,0.0,1,1.05,164.95,Open / Active
