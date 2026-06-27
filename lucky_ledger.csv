@@ -1,6 +1,7 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-06-27,TSLA,Short Put,360.0,2026-06-29,0.2,0.0,1,1.05,18.95,Open / Active
 2026-06-27,AVGO,Short Put,345.0,2026-06-29,0.3,0.0,1,1.05,28.95,Open / Active
+2026-06-27,NVDA,Short Put,185.0,2026-06-29,0.15,0.0,1,1.05,13.95,Open / Active
 2026-06-26,GLD,Covered Call,405.0,2026-07-24,1.77,0.0,1,1.06,175.94,Open / Active
 2026-06-25,TSM,Short Put,390.0,2026-06-26,0.4,0.0,1,1.05,38.95,Expired (Win)
 2026-06-25,AVGO,Short Put,357.5,2026-06-26,0.39,0.0,1,1.05,37.95,Expired (Win)
