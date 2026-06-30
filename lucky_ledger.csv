@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-06-30,TSM,Short Put,432.5,2026-07-02,1.2,0.0,1,1.05,118.95,Open / Active
 2026-06-29,TSM,Short Put,400.0,2026-07-02,0.9,0.0,1,0.8,89.2,Open / Active
 2026-06-29,AMD,Short Put,437.5,2026-07-02,1.21,0.0,1,1.05,119.95,Open / Active
 2026-06-29,LITE,Short Put,645.0,2026-07-02,1.35,0.0,1,1.9,133.1,Open / Active
