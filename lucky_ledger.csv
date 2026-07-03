@@ -1,17 +1,17 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-07-02,META,Short Put,577.5,2026-07-02,0.69,0.0,1,1.04,67.96,Open / Active
 2026-07-02,TSLA,Short Put,387.5,2026-07-06,0.6,0.0,1,1.04,58.96,Open / Active
 2026-07-02,NVDA,Short Put,190.0,2026-07-06,0.23,0.0,1,1.04,21.96,Open / Active
 2026-07-02,AVGO,Short Put,345.0,2026-07-06,0.35,0.0,1,1.04,33.96,Open / Active
-2026-07-01,GOOGL,Short Put,347.5,2026-07-02,0.55,0.0,1,0.77,54.23,Open / Active
-2026-07-01,NBIS,Short Put,215.0,2026-07-02,1.6,0.0,1,1.05,158.95,Open / Active
-2026-06-30,TSM,Short Put,432.5,2026-07-02,1.2,0.0,1,0.77,119.23,Open / Active
-2026-06-30,AVGO,Short Put,352.5,2026-07-02,0.82,0.0,1,1.05,80.95,Open / Active
-2026-06-30,META,Short Put,530.0,2026-07-02,0.76,0.0,1,1.05,74.95,Open / Active
-2026-06-30,SOXX,Short Put,560.0,2026-07-02,1.0,0.0,1,1.05,98.95,Open / Active
-2026-06-29,TSM,Short Put,400.0,2026-07-02,0.9,0.0,1,0.8,89.2,Open / Active
-2026-06-29,AMD,Short Put,437.5,2026-07-02,1.21,0.0,1,1.05,119.95,Open / Active
-2026-06-29,LITE,Short Put,645.0,2026-07-02,1.35,0.0,1,1.9,133.1,Open / Active
+2026-07-02,META,Short Put,577.5,2026-07-02,0.69,0.0,1,1.04,67.96,Expired (Win)
+2026-07-01,GOOGL,Short Put,347.5,2026-07-02,0.55,0.0,1,0.77,54.23,Expired (Win)
+2026-07-01,NBIS,Short Put,215.0,2026-07-02,1.6,0.0,1,1.05,158.95,Expired (Win)
+2026-06-30,TSM,Short Put,432.5,2026-07-02,1.2,0.0,1,0.77,119.23,Expired (Win)
+2026-06-30,AVGO,Short Put,352.5,2026-07-02,0.82,0.0,1,1.05,80.95,Expired (Win)
+2026-06-30,META,Short Put,530.0,2026-07-02,0.76,0.0,1,1.05,74.95,Expired (Win)
+2026-06-30,SOXX,Short Put,560.0,2026-07-02,1.0,0.0,1,1.05,98.95,Expired (Win)
+2026-06-29,TSM,Short Put,400.0,2026-07-02,0.9,0.0,1,0.8,89.2,Expired (Win)
+2026-06-29,AMD,Short Put,437.5,2026-07-02,1.21,0.0,1,1.05,119.95,Expired (Win)
+2026-06-29,LITE,Short Put,645.0,2026-07-02,1.35,0.0,1,1.9,133.1,Expired (Win)
 2026-06-27,TSLA,Short Put,360.0,2026-06-29,0.2,0.0,1,1.05,18.95,Expired (Win)
 2026-06-27,AVGO,Short Put,345.0,2026-06-29,0.3,0.0,1,1.05,28.95,Expired (Win)
 2026-06-27,NVDA,Short Put,185.0,2026-06-29,0.15,0.0,1,1.05,13.95,Expired (Win)
