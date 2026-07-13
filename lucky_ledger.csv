@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-07-13,LITE,Short Put,660.0,2026-07-17,4.8,0.0,1,0.13,479.87,Open / Active
+2026-07-13,MRVL,Short Put,185.0,2026-07-17,1.14,0.0,1,1.05,112.95,Open / Active
 2026-07-10,AMD,Short Put,505.0,2026-07-14,1.16,0.0,1,1.04,114.96,Open / Active
 2026-07-07,LITE,Short Put,595.0,2026-07-10,2.8,0.0,1,1.04,278.96,Expired (Win)
 2026-07-07,NBIS,Short Put,155.0,2026-07-10,0.76,0.0,1,0.79,75.21,Expired (Win)
