@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-07-15,MRVL,Short Put,192.5,2026-07-17,1.1,0.0,1,1.05,108.95,Open / Active
+2026-07-15,MRVL,Short Put,192.5,2026-07-17,1.1,0.0,1,0.77,109.23,Open / Active
 2026-07-14,NBIS,Short Put,160.0,2026-07-17,1.1,0.0,1,0.62,109.38,Open / Active
 2026-07-13,LITE,Short Put,660.0,2026-07-17,4.8,0.0,1,0.13,479.87,Open / Active
 2026-07-13,MRVL,Short Put,185.0,2026-07-17,1.14,0.0,1,0.77,113.23,Open / Active
