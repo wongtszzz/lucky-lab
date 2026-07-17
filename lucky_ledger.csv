@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-07-17,GOOGL,Short Put,335.0,2026-07-20,0.49,0.0,1,1.05,47.95,Open / Active
+2026-07-17,GOOGL,Short Put,335.0,2026-07-20,0.49,0.0,1,1.04,47.96,Open / Active
 2026-07-15,MRVL,Short Put,192.5,2026-07-17,1.1,0.0,1,0.77,109.23,Open / Active
 2026-07-15,INTC,Short Put,97.5,2026-07-17,0.68,0.0,1,1.05,66.95,Open / Active
 2026-07-15,AMD,Short Put,480.0,2026-07-17,1.26,0.0,1,1.05,124.95,Open / Active
