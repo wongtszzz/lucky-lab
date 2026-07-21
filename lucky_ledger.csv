@@ -1,6 +1,7 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-07-21,MSFT,Short Put,387.5,2026-07-22,0.46,0.0,1,1.05,44.95,Open / Active
 2026-07-21,NVDA,Short Put,200.0,2026-07-22,0.5,0.0,1,0.85,49.15,Open / Active
+2026-07-21,META,Short Put,615.0,2026-07-22,0.61,0.0,1,1.05,59.95,Open / Active
 2026-07-20,JPM,Short Put,330.0,2026-07-24,1.05,0.0,1,0.69,104.31,Open / Active
 2026-07-20,TSM,Short Put,357.5,2026-07-24,1.01,0.0,1,1.05,99.95,Open / Active
 2026-07-20,NVDA,Short Put,195.0,2026-07-24,0.94,0.0,1,1.04,92.96,Open / Active
