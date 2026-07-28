@@ -6,7 +6,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-07-27,GLD,Covered Call,405.0,2026-08-28,1.55,0.0,1,1.04,153.96,Open / Active
 2026-07-24,JPM,Short Put,337.5,2026-07-31,0.96,0.0,1,1.04,94.96,Open / Active
 2026-07-24,TSLA,Short Put,295.0,2026-07-27,0.63,0.0,1,1.05,61.95,Expired (Win)
-2026-07-24,AMD,Short Put,485.0,2026-07-27,1.36,0.0,1,1.05,134.95,Expired (Win)
+2026-07-24,AMD,Short Put,485.0,2026-07-27,1.36,0.0,1,1.76,134.24,Expired (Win)
 2026-07-24,AVGO,Short Put,367.5,2026-07-27,0.92,0.0,1,1.04,90.96,Expired (Win)
 2026-07-24,NBIS,Short Put,185.0,2026-07-24,0.59,0.0,1,0.62,58.38,Expired (Win)
 2026-07-24,NVDA,Short Put,200.0,2026-07-27,0.35,3.08,1,1.05,-274.05,Closed (Loss)
