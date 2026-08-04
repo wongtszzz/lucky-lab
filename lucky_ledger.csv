@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-08-04,META,Short Put,547.5,2026-08-07,0.86,0.0,1,1.04,84.96,Open / Active
+2026-08-04,TSLA,Short Put,305.0,2026-08-07,1.0,0.0,1,1.05,98.95,Open / Active
 2026-08-03,AVGO,Short Put,355.0,2026-08-05,0.78,0.0,1,0.77,77.23,Open / Active
 2026-07-31,TSM,Short Put,372.5,2026-08-07,1.91,0.0,1,1.04,189.96,Open / Active
 2026-07-31,NVDA,Short Put,192.5,2026-08-05,2.09,0.0,1,0.7,208.3,Open / Active
