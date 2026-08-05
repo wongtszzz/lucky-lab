@@ -2,6 +2,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-08-05,AMD,Short Put,465.0,2026-08-05,0.71,0.0,1,1.05,69.95,Open / Active
 2026-08-05,INTC,Short Put,91.0,2026-08-07,0.55,0.0,1,0.77,54.23,Open / Active
 2026-08-05,NBIS,Short Put,180.0,2026-08-07,0.7,0.0,1,0.62,69.38,Open / Active
+2026-08-05,AMD,Short Put,445.0,2026-08-07,2.27,0.0,1,1.05,225.95,Open / Active
 2026-08-04,META,Short Put,547.5,2026-08-07,0.86,0.0,1,1.04,84.96,Open / Active
 2026-08-04,TSLA,Short Put,305.0,2026-08-07,1.0,0.0,1,0.56,99.44,Open / Active
 2026-08-03,AVGO,Short Put,355.0,2026-08-05,0.78,0.0,1,0.77,77.23,Open / Active
