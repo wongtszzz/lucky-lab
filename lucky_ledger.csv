@@ -4,7 +4,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-08-10,AVGO,Short Put,402.5,2026-08-14,1.2,0.0,1,1.04,118.96,Open / Active
 2026-08-10,LITE,Short Put,690.0,2026-08-14,4.0,0.0,1,1.04,398.96,Open / Active
 2026-08-10,ASML,Short Put,1615.0,2026-08-14,4.3,0.0,1,1.05,428.95,Open / Active
-2026-08-10,INTC,Short Put,92.0,2026-08-12,0.46,0.0,1,1.05,44.95,Open / Active
+2026-08-10,INTC,Short Put,92.0,2026-08-12,0.46,0.0,1,1.04,44.96,Open / Active
 2026-08-07,TSLA,Short Put,317.5,2026-08-10,0.55,0.0,1,1.04,53.96,Open / Active
 2026-08-07,TSLA,Short Put,312.5,2026-08-12,1.12,0.0,1,1.04,110.96,Open / Active
 2026-08-07,NVDA,Short Put,217.5,2026-08-10,0.51,0.0,1,1.05,49.95,Open / Active
