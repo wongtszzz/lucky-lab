@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-08-12,TSLA,Short Put,315.0,2026-08-14,0.7,0.0,1,1.05,68.95,Open / Active
 2026-08-11,AMD,Short Put,447.5,2026-08-12,1.09,0.0,1,1.04,107.96,Open / Active
 2026-08-11,MU,Short Put,790.0,2026-08-14,3.7,0.0,1,1.04,368.96,Open / Active
 2026-08-10,NVDA,Short Put,215.0,2026-08-14,1.02,0.0,1,1.04,100.96,Open / Active
