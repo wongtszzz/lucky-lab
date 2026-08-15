@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-08-15,AVGO,Short Put,407.5,2026-08-21,16.95,0.0,1,1.05,1693.95,Open / Active
 2026-08-13,NVDA,Short Put,220.0,2026-08-17,0.85,0.0,1,1.04,83.96,Open / Active
 2026-08-13,NVDA,Short Put,215.0,2026-08-21,1.05,0.0,1,1.04,103.96,Open / Active
 2026-08-13,LITE,Short Put,865.0,2026-08-14,2.2,0.0,1,1.04,218.96,Expired (Win)
