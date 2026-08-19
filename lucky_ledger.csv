@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-08-19,AVGO,Short Put,400.0,2026-08-21,39.58,0.0,1,1.05,3956.95,Open / Active
+2026-08-19,AVGO,Short Put,400.0,2026-08-21,39.58,0.0,1,0.77,3957.23,Open / Active
 2026-08-18,ASML,Short Put,1695.0,2026-08-21,4.3,0.0,1,0.05,429.95,Open / Active
 2026-08-17,NBIS,Short Put,222.5,2026-08-21,1.1,0.0,1,1.05,108.95,Open / Active
 2026-08-17,AMD,Short Put,482.5,2026-08-19,1.1,0.0,1,0.77,109.23,Open / Active
