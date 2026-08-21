@@ -7,7 +7,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-08-17,APP,Short Put,290.0,2026-08-21,1.0,0.0,1,0.04,99.96,Open / Active
 2026-08-17,INTC,Short Put,99.0,2026-08-19,0.48,0.0,1,1.05,46.95,Expired (Win)
 2026-08-17,GOOGL,Short Put,335.0,2026-08-19,0.55,0.0,1,1.04,53.96,Expired (Win)
-2026-08-17,JPM,Short Put,357.5,2026-08-21,0.99,6.74,1,1.75,-576.75,Closed (Loss)
+2026-08-17,JPM,Short Put,357.5,2026-08-21,0.99,6.74,1,1.7,-576.7,Closed (Loss)
 2026-08-17,AMD,Short Put,482.5,2026-08-19,1.1,17.0,1,1.82,-1591.82,Closed (Loss)
 2026-08-15,AVGO,Short Put,407.5,2026-08-21,16.95,0.0,1,1.08,1693.92,Open / Active
 2026-08-15,AVGO,Short Put,400.0,2026-08-19,10.17,39.58,1,1.75,-2942.75,Closed (Loss)
