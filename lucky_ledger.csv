@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-08-24,AVGO,Covered Call,372.5,2026-08-26,1.41,0.0,1,1.04,139.96,Open / Active
+2026-08-24,AMD,Short Put,465.0,2026-09-04,21.86,0.0,1,1.05,2184.95,Open / Active
 2026-08-21,JPM,Short Put,357.5,2026-08-28,7.94,0.0,1,0.71,793.29,Open / Active
 2026-08-21,NBIS,Short Put,200.0,2026-08-28,3.16,0.0,1,1.05,314.95,Open / Active
 2026-08-19,AVGO,Short Put,400.0,2026-08-21,39.58,0.0,1,0.77,3957.23,Expired (Win)
