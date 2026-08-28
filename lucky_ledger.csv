@@ -1,6 +1,7 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-08-28,JPM,Short Put,350.0,2026-09-04,1.21,0.0,1,0.7,120.3,Open / Active
 2026-08-28,AVGO,Covered Call,402.5,2026-09-04,4.5,0.0,1,1.05,448.95,Open / Active
+2026-08-28,NVDA,Short Put,215.0,2026-08-31,0.48,0.0,1,1.05,46.95,Open / Active
 2026-08-27,MU,Short Put,865.0,2026-08-28,1.06,0.0,1,0.77,105.23,Open / Active
 2026-08-27,AVGO,Covered Call,377.5,2026-08-28,1.36,0.0,1,1.04,134.96,Open / Active
 2026-08-27,AVGO,Covered Call,402.5,2026-09-04,5.7,0.0,1,1.05,568.95,Open / Active
