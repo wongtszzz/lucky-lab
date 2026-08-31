@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-08-31,TSM,Short Put,405.0,2026-09-04,1.4,0.0,1,1.05,138.95,Open / Active
 2026-08-28,JPM,Short Put,350.0,2026-09-04,1.21,0.0,1,0.7,120.3,Open / Active
 2026-08-28,AVGO,Covered Call,402.5,2026-09-04,4.5,0.0,1,1.05,448.95,Open / Active
 2026-08-28,NVDA,Short Put,215.0,2026-08-31,0.48,0.0,1,1.05,46.95,Open / Active
