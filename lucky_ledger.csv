@@ -1,6 +1,7 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-09-01,TSLA,Short Put,340.0,2026-09-04,1.0,0.0,1,1.04,98.96,Open / Active
 2026-09-01,LITE,Short Put,770.0,2026-09-04,2.3,0.0,1,1.04,228.96,Open / Active
+2026-09-01,DDOG,Short Put,212.5,2026-09-04,1.16,0.0,1,1.05,114.95,Open / Active
 2026-08-31,TSM,Short Put,405.0,2026-09-04,1.4,0.0,1,1.05,138.95,Open / Active
 2026-08-28,JPM,Short Put,350.0,2026-09-04,1.21,0.0,1,0.7,120.3,Open / Active
 2026-08-28,AVGO,Covered Call,402.5,2026-09-04,4.5,0.0,1,1.05,448.95,Open / Active
