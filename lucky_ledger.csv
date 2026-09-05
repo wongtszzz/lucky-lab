@@ -4,19 +4,19 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-09-03,INTC,Covered Call,99.0,2026-09-11,0.61,0.0,1,1.04,59.96,Open / Active
 2026-09-03,AVGO,Covered Call,390.0,2026-09-16,1.0,0.0,1,1.04,98.96,Open / Active
 2026-09-03,AVGO,Covered Call,375.0,2026-09-09,0.72,0.0,1,0.77,71.23,Open / Active
-2026-09-01,TSLA,Short Put,340.0,2026-09-04,1.0,0.0,1,1.04,98.96,Open / Active
-2026-09-01,LITE,Short Put,770.0,2026-09-04,2.3,0.0,1,1.04,228.96,Open / Active
-2026-09-01,DDOG,Short Put,212.5,2026-09-04,1.16,0.0,1,1.04,114.96,Open / Active
-2026-08-31,TSM,Short Put,405.0,2026-09-04,1.4,0.0,1,1.05,138.95,Open / Active
-2026-08-28,JPM,Short Put,350.0,2026-09-04,1.21,0.0,1,0.7,120.3,Open / Active
-2026-08-28,AVGO,Covered Call,402.5,2026-09-04,4.5,0.0,1,1.05,448.95,Open / Active
-2026-08-28,NVDA,Short Put,212.5,2026-09-04,1.38,0.0,1,1.05,136.95,Open / Active
+2026-09-01,TSLA,Short Put,340.0,2026-09-04,1.0,0.0,1,1.04,98.96,Expired (Win)
+2026-09-01,LITE,Short Put,770.0,2026-09-04,2.3,0.0,1,1.04,228.96,Expired (Win)
+2026-09-01,DDOG,Short Put,212.5,2026-09-04,1.16,0.0,1,1.04,114.96,Expired (Win)
+2026-08-31,TSM,Short Put,405.0,2026-09-04,1.4,0.0,1,1.05,138.95,Expired (Win)
+2026-08-28,JPM,Short Put,350.0,2026-09-04,1.21,0.0,1,0.7,120.3,Expired (Win)
+2026-08-28,AVGO,Covered Call,402.5,2026-09-04,4.5,0.0,1,1.05,448.95,Expired (Win)
+2026-08-28,NVDA,Short Put,212.5,2026-09-04,1.38,0.0,1,1.05,136.95,Expired (Win)
 2026-08-28,NVDA,Short Put,215.0,2026-08-31,0.48,0.0,1,1.05,46.95,Expired (Win)
 2026-08-28,TSLA,Short Put,337.5,2026-08-31,0.5,0.0,1,1.04,48.96,Expired (Win)
-2026-08-27,AVGO,Covered Call,402.5,2026-09-04,5.7,0.0,1,1.05,568.95,Open / Active
+2026-08-27,AVGO,Covered Call,402.5,2026-09-04,5.7,0.0,1,1.05,568.95,Expired (Win)
 2026-08-27,MU,Short Put,865.0,2026-08-28,1.06,0.0,1,0.77,105.23,Expired (Win)
 2026-08-27,AVGO,Covered Call,377.5,2026-08-28,1.36,0.0,1,1.04,134.96,Expired (Win)
-2026-08-24,AMD,Short Put,465.0,2026-09-04,21.86,0.0,1,0.74,2185.26,Open / Active
+2026-08-24,AMD,Short Put,465.0,2026-09-04,21.86,0.0,1,0.74,2185.26,Expired (Win)
 2026-08-24,INTC,Covered Call,99.0,2026-09-02,0.4,0.0,1,0.77,39.23,Expired (Win)
 2026-08-24,AVGO,Covered Call,372.5,2026-08-26,1.41,0.0,1,1.04,139.96,Expired (Win)
 2026-08-21,NBIS,Short Put,200.0,2026-08-28,3.16,0.1,1,2.09,303.91,Closed (Win)
