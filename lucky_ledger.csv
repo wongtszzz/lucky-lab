@@ -1,5 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
-2026-09-10,MU,Short Put,927.5,2026-09-11,1.3,0.0,1,1.05,128.95,Open / Active
+2026-09-10,MU,Short Put,927.5,2026-09-11,1.3,0.0,1,0.77,129.23,Open / Active
 2026-09-09,AVGO,Covered Call,380.0,2026-09-14,1.3,0.0,1,1.04,128.96,Open / Active
 2026-09-09,COST,Short Put,885.0,2026-09-11,1.07,0.0,1,1.04,105.96,Open / Active
 2026-09-09,ASML,Short Put,1645.0,2026-09-11,3.0,0.0,1,0.04,299.96,Open / Active
