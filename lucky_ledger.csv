@@ -2,7 +2,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-09-28,AMD,Short Put,587.5,2026-09-30,5.34,0.0,1,0.7,533.3,Open / Active
 2026-09-28,META,Short Put,712.5,2026-09-30,7.0,0.0,1,1.06,698.94,Open / Active
 2026-09-28,TSLA,Short Put,357.5,2026-09-30,3.1,0.0,1,0.72,309.28,Open / Active
-2026-09-28,DELL,Short Put,490.0,2026-10-02,1.63,0.0,1,1.05,161.95,Open / Active
+2026-09-28,DELL,Short Put,490.0,2026-10-02,1.63,0.0,1,0.62,162.38,Open / Active
 2026-09-25,AVGO,Covered Call,365.0,2026-09-30,1.2,0.0,1,1.05,118.95,Open / Active
 2026-09-25,JPM,Short Put,335.0,2026-10-02,1.58,0.0,1,1.04,156.96,Open / Active
 2026-09-25,TSLA,Short Put,362.5,2026-09-28,0.81,2.55,1,1.75,-175.75,Closed (Loss)
