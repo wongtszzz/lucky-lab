@@ -12,8 +12,8 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-09-28,INTC,Short Put,110.0,2026-09-30,0.73,0.0,1,0.77,72.23,Expired (Win)
 2026-09-28,LITE,Short Put,800.0,2026-10-02,3.8,0.2972,1,0.0,350.28,Closed (Win)
 2026-09-28,TSLA,Short Put,357.5,2026-09-30,3.1,9.42,1,1.41,-633.41,Closed (Loss)
-2026-09-25,JPM,Short Put,335.0,2026-10-02,1.58,0.0,1,1.04,156.96,Open / Active
 2026-09-25,AVGO,Covered Call,365.0,2026-09-30,1.2,0.0,1,1.05,118.95,Expired (Win)
+2026-09-25,JPM,Short Put,335.0,2026-10-02,1.58,3.04,1,1.04,-147.04,Closed (Loss)
 2026-09-25,TSLA,Short Put,362.5,2026-09-28,0.81,2.55,1,1.75,-175.75,Closed (Loss)
 2026-09-25,META,Short Put,725.0,2026-10-02,1.3,6.01,1,2.08,-473.08,Closed (Loss)
 2026-09-25,AMD,Short Put,600.0,2026-09-28,1.05,4.14,1,1.46,-310.46,Closed (Loss)
