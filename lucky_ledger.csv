@@ -3,6 +3,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-10-05,DELL,Short Put,515.0,2026-10-09,1.87,0.0,1,1.04,185.96,Open / Active
 2026-10-05,TSLA,Short Put,360.0,2026-10-09,1.2,0.0,1,1.04,118.96,Open / Active
 2026-10-05,TSLA,Short Put,365.0,2026-10-07,0.93,0.0,1,0.56,92.44,Open / Active
+2026-10-05,GOOGL,Short Put,337.5,2026-10-07,0.73,0.0,1,1.05,71.95,Open / Active
 2026-10-02,JPM,Short Put,330.0,2026-10-09,3.87,0.0,1,0.7,386.3,Open / Active
 2026-10-02,APP,Short Put,280.0,2026-10-16,17.16,0.0,1,0.27,1715.73,Open / Active
 2026-10-02,AVGO,Short Put,380.0,2026-10-09,0.71,0.0,1,1.03,69.97,Open / Active
