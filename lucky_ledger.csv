@@ -1,7 +1,7 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-10-06,DDOG,Short Put,257.5,2026-10-09,1.0,0.0,1,1.04,98.96,Open / Active
 2026-10-06,LLY,Short Put,1095.0,2026-10-09,2.1,0.0,1,1.04,208.96,Open / Active
-2026-10-06,GS,Short Put,860.0,2026-10-09,1.6,0.0,1,1.05,158.95,Open / Active
+2026-10-06,GS,Short Put,860.0,2026-10-09,1.6,0.0,1,1.04,158.96,Open / Active
 2026-10-05,NBIS,Short Put,215.0,2026-10-09,1.18,0.0,1,1.04,116.96,Open / Active
 2026-10-05,DELL,Short Put,515.0,2026-10-09,1.87,0.0,1,1.04,185.96,Open / Active
 2026-10-05,TSLA,Short Put,360.0,2026-10-09,1.2,0.0,1,1.04,118.96,Open / Active
