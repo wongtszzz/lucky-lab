@@ -1,6 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-10-07,GOOGL,Short Put,337.5,2026-10-09,0.95,0.0,1,1.04,93.96,Open / Active
-2026-10-07,TSLA,Short Put,362.5,2026-10-09,0.76,0.0,1,1.05,74.95,Open / Active
+2026-10-07,TSLA,Short Put,362.5,2026-10-09,0.76,0.0,1,1.03,74.97,Open / Active
 2026-10-06,DDOG,Short Put,257.5,2026-10-09,1.0,0.0,1,1.04,98.96,Open / Active
 2026-10-06,LLY,Short Put,1095.0,2026-10-09,2.1,0.0,1,1.04,208.96,Open / Active
 2026-10-06,GS,Short Put,860.0,2026-10-09,1.6,0.0,1,1.04,158.96,Open / Active
