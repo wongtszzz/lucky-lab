@@ -1,5 +1,6 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
 2026-10-15,APP,Short Put,275.0,2026-10-23,9.82,0.0,1,1.06,980.94,Open / Active
+2026-10-15,CRWD,Short Put,250.0,2026-10-23,11.81,0.0,1,1.05,1179.95,Open / Active
 2026-10-13,TSLA,Short Put,360.0,2026-10-19,2.0,0.0,1,1.04,198.96,Open / Active
 2026-10-13,GOOGL,Short Put,337.5,2026-10-19,0.8,0.0,1,1.03,78.97,Open / Active
 2026-10-13,GOOGL,Short Put,342.5,2026-10-14,0.33,0.0,1,1.03,31.97,Expired (Win)
