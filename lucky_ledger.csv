@@ -4,7 +4,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-10-13,TSLA,Short Put,360.0,2026-10-19,2.0,0.0,1,1.04,198.96,Open / Active
 2026-10-13,GOOGL,Short Put,337.5,2026-10-19,0.8,0.0,1,1.03,78.97,Open / Active
 2026-10-13,GOOGL,Short Put,342.5,2026-10-14,0.33,0.0,1,1.03,31.97,Expired (Win)
-2026-10-12,SNDK,Short Put,1320.0,2026-10-16,4.1,42.38,1,0.0,-3828.0,Closed (Loss)
+2026-10-12,SNDK,Short Put,1320.0,2026-10-16,4.1,42.38,1,0.23,-3828.23,Closed (Loss)
 2026-10-12,CRWD,Short Put,252.5,2026-10-16,1.25,10.55,1,2.08,-932.08,Closed (Loss)
 2026-10-09,GOOGL,Short Put,342.5,2026-10-14,1.3,0.0,1,0.79,129.21,Expired (Win)
 2026-10-09,GLD,Covered Call,390.0,2026-10-12,0.36,0.0,1,1.04,34.96,Expired (Win)
