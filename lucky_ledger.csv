@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-10-20,AVGO,Covered Call,360.0,2026-10-26,0.94,0.0,1,1.05,92.95,Open / Active
 2026-10-19,NVDA,Short Put,210.0,2026-10-23,1.05,0.0,1,1.04,103.96,Open / Active
 2026-10-19,GOOGL,Short Put,337.5,2026-10-21,1.09,0.0,1,1.04,107.96,Open / Active
 2026-10-19,AVGO,Covered Call,360.0,2026-10-23,0.46,0.0,1,1.03,44.97,Open / Active
