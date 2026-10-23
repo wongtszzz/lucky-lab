@@ -11,7 +11,7 @@ Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Sta
 2026-10-19,AVGO,Covered Call,360.0,2026-10-23,0.46,0.0,1,1.03,44.97,Open / Active
 2026-10-19,TSM,Short Put,402.5,2026-10-23,1.33,0.0,1,1.05,131.95,Open / Active
 2026-10-19,GOOGL,Short Put,337.5,2026-10-21,1.09,4.7,1,1.59,-362.59,Closed (Loss)
-2026-10-15,SNDK,Short Put,1260.0,2026-10-23,42.38,26.67,1,0.32,1570.68,Closed (Win)
+2026-10-15,SNDK,Short Put,1260.0,2026-10-23,42.38,26.67,1,1.36,1569.64,Closed (Win)
 2026-10-15,CRWD,Short Put,250.0,2026-10-23,11.81,4.2,1,1.61,759.39,Closed (Win)
 2026-10-15,GLD,Covered Call,390.0,2026-10-19,0.35,0.0,1,1.03,33.97,Expired (Win)
 2026-10-15,APP,Short Put,275.0,2026-10-23,9.82,15.24,1,2.1,-544.1,Closed (Loss)
