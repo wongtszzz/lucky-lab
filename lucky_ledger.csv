@@ -1,4 +1,5 @@
 Date,Ticker,Type,Strike,Expiry,Open Price,Close Price,Qty,Commission,Premium,Status
+2026-10-23,CRWD,Short Put,240.0,2026-10-30,5.5,0.0,1,1.05,548.95,Open / Active
 2026-10-22,META,Short Put,622.5,2026-10-26,1.66,0.0,1,0.77,165.23,Open / Active
 2026-10-21,GOOGL,Short Put,335.0,2026-10-23,4.8,0.0,1,0.56,479.44,Open / Active
 2026-10-20,AVGO,Covered Call,360.0,2026-10-26,0.94,0.0,1,1.04,92.96,Open / Active
